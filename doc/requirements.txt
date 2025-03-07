@@ -1,0 +1,4 @@
+#Base requirment python 3.11
+PyQt5==5.15.11
+Qt.py==1.3.10
+#NodeGrapeQt
