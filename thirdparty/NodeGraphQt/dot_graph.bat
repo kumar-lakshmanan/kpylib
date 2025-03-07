@@ -1,0 +1,1 @@
+pydeps . --reverse --cluster --rankdir BT --only NodeGraphQt --rmprefix NodeGraphQt.
