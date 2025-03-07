@@ -3,6 +3,7 @@
 	<name>kpylib</name>
 	<comment></comment>
 	<projects>
+		<project>thirdparties</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
