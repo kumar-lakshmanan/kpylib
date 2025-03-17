@@ -52,6 +52,7 @@ class NodeViewer(QtWidgets.QGraphicsView):
     node_double_clicked = QtCore.Signal(str)
     data_dropped = QtCore.Signal(QtCore.QMimeData, object)
     custom_data_dropped = QtCore.Signal(QtCore.QEvent, object)
+    custom_key_pressed = QtCore.Signal(QtCore.QEvent)
     context_menu_prompt = QtCore.Signal(str, object)
 
     def __init__(self, parent=None, undo_stack=None):
@@ -768,6 +769,8 @@ class NodeViewer(QtWidgets.QGraphicsView):
         # hide and reset cursor text.
         self._cursor_text.setPlainText('')
         self._cursor_text.setVisible(False)
+        
+        self.custom_key_pressed.emit(event)
 
     # --- scene events ---
 
