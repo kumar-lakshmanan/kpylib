@@ -15,6 +15,7 @@ import re
 import socket
 import getpass
 import logging
+import logging.config
 import uuid
 import traceback
 import subprocess
@@ -23,6 +24,19 @@ import datetime
 import zipfile
 
 import kToolsDefaultLookUps
+from pickle import NONE
+
+class CustomLogHandler(logging.Handler):
+    
+    def __init__(self, logPrinterFn=None):
+        super().__init__()
+        self.callBackLogPrinterFn = logPrinterFn
+            
+    def emit(self, record):
+        msg = self.format(record)
+        if self.callBackLogPrinterFn: 
+            self.callBackLogPrinterFn(msg)
+            
 
 class KTools(object):
     '''
@@ -51,9 +65,12 @@ class KTools(object):
         self.appName = appName
         self.cfgFile = None
         self.cfg = None
+        self.qapp = None
         
         self.exitCallBackFn = None
         self.entryCallBackFn = None
+        self.logCustomLogPrintFn = None
+        self.logFormatter = None
         
         if not appName: raise Exception(f"Unknown app or AppName is missing.")
         if not self.isAppNameValid(appName): raise Exception(f"AppName:[{appName}] is not valid.")
@@ -107,27 +124,40 @@ class KTools(object):
         """
         if hasattr(self, 'logSys') and self.logSys: return self.logSys
         
+        currentConfig = {}
+        currentConfig['version'] = 1
+        currentConfig['disable_existing_loggers'] = 0
+        logging.config.dictConfig(currentConfig)
+                
         for eachHandler in logging.root.handlers:
             logging.root.removeHandler(eachHandler)
        
-        logFormatter = logging.Formatter(fmt=self.cfg["logging"]["logFormat"], datefmt=self.cfg["logging"]["logDateTimeFormat"]) 
+        self.logFormatter  = logging.Formatter(fmt=self.cfg["logging"]["logFormat"], datefmt=self.cfg["logging"]["logDateTimeFormat"]) 
         self.logSys = logging.getLogger(self.appName)
         self.logSys.setLevel(self.cfg["logging"]["logLevel"])
         self.logSys.disabled = self.cfg["logging"]["logDisable"]
-        
+                       
         if self.cfg["logging"]["logToConsole"]:
             streamHandler = logging.StreamHandler()
             streamHandler.set_name(f"StreamHandler_{self.appName}")
-            streamHandler.setFormatter(logFormatter)
+            streamHandler.setFormatter(self.logFormatter)
             self.logSys.addHandler(streamHandler)
             
         if self.cfg["logging"]["logToFile"]:
             fileHandler = logging.FileHandler(self.cfg["logging"]["logFile"])
             fileHandler.set_name(f"FileHandler_{self.appName}")
-            fileHandler.setFormatter(logFormatter)
+            fileHandler.setFormatter(self.logFormatter)
             self.logSys.addHandler(fileHandler)
         
         return self.logSys
+    
+    def addCustomLogPrinter(self, logCustomLogPrintFn):
+        if logCustomLogPrintFn:
+            self.logCustomLogPrintFn = logCustomLogPrintFn
+            customHandler = CustomLogHandler(self.logCustomLogPrintFn)
+            customHandler.set_name(f"CustomHandler_{self.appName}")
+            customHandler.setFormatter(self.logFormatter)
+            self.logSys.addHandler(customHandler)        
 
     def _logFormatter(self, msg, skipLevel=2):
         fnName, clsName, modName, modFile = self.getCallerInfo(skipLevel)
@@ -140,21 +170,28 @@ class KTools(object):
             if not clsName: clsName = modName
             return f'[{clsName}-{fnName}] {msg}'
     
-    def info(self, msg, skipLevel=1): 
+    def alignedParams(self, key, value, justify=25, justfyChar='.'):
+        return str(key).strip().ljust(justify, justfyChar) + str(value).strip() 
+    
+    def info(self, msg, skipLevel=2): 
         msg = self._logFormatter(msg, skipLevel)   
         self.logSys.info(msg)
 
-    def debug(self, msg, skipLevel=1):
+
+    def debug(self, msg, skipLevel=2):
         msg = self._logFormatter(msg, skipLevel)
         self.logSys.debug(msg)
 
-    def warn(self, msg, skipLevel=1):
+
+    def warn(self, msg, skipLevel=2):
         msg = self._logFormatter(msg, skipLevel)
         self.logSys.warning(msg)
 
-    def error(self, msg, skipLevel=1):
+
+    def error(self, msg, skipLevel=2):
         msg = self._logFormatter(msg, skipLevel)
         self.logSys.error(msg) if hasattr(self, 'logSys') and self.logSys else print(msg) 
+
 
     def shellExecute(self, command):
         subprocess.call(command)
@@ -164,8 +201,8 @@ class KTools(object):
         raise Exception(msg)
     
     def doSystemErrorHandle(self, expType, expVal, traceBack):
-        lastErrorInfo = self.getLastErrorInfo()
-        if 'No error' in lastErrorInfo:
+        lastErrorInfo = self.getLastErrorInfo(expType, expVal, traceBack)
+        if not 'No error' in lastErrorInfo:
             lastError = traceback.format_exception(expType, expVal, traceBack)
             lastErrorInfo = ""
             for eachLine in lastError:
@@ -173,18 +210,17 @@ class KTools(object):
             errorContent = f"\nError happend on {strftime('%Y-%m-%d %I:%M:%S %p')}\n{lastErrorInfo}"
         else:
             errorContent = f"\nNo system error on {strftime('%Y-%m-%d %I:%M:%S %p')}"        
-        self.error(errorContent)
-        print(errorContent)
+        self.error(errorContent, 4) if hasattr(self, 'logSys') else print(errorContent)        
         fileName = f"error_{strftime('%Y%m%d%H%M%S')}.log"
         self.writeFileContent(fileName, errorContent)
 
     def doEntryStartUp(self):
-        self.info(f"Staring app {self.appName} startup activity....")
+        self.info(f"Starting app {self.appName} startup activity....")
         if hasattr(self, 'entryCallBackFn') and self.entryCallBackFn: self.entryCallBackFn()
         self.info(f"App {self.appName} initialized.")
                 
     def doExitCleanUp(self):
-        self.info(f"Staring app {self.appName} shutdown cleanup activity....")
+        self.info(f"Starting app {self.appName} shutdown cleanup activity....")
         if hasattr(self, 'exitCallBackFn') and self.exitCallBackFn: self.exitCallBackFn()
         self.info(f"Thank you for using the app {self.appName}.")
         
@@ -243,8 +279,14 @@ class KTools(object):
             return fnName, clsName, modName, modFile                            
         return fnName, clsName, modName, modFile
 
-    def getLastErrorInfo(self, skipLevel=1):
-        lastErrorData = traceback.format_exc()
+    def getLastErrorInfo(self, expType=None, expVal=None, traceBack=None, skipLevel=1):
+        if traceBack!=None:
+            lastErrorData = traceback.format_tb(traceBack)
+        elif expVal!=None and traceBack==None:
+            lastErrorData = expVal.__str__()
+        else:
+            lastErrorData = traceback.format_exc()
+            
         if 'NoneType: None' in lastErrorData:
             errorContent = f"No error found recently."
         else:
@@ -467,6 +509,25 @@ class KTools(object):
             self.debug("Force delete: " + fpath)
             subprocess.run(["cmd", "/c", "del", "/F", "/Q", fpath], shell=False)
         
+
+    def getFileList(self, dirToScan, ext=".py"):
+        """Recursively lists all files with the given extension in a directory and its subdirectories.
+    
+        Args:
+            directory (str): The root directory to scan.
+            extension (str): The file extension to look for (e.g., ".txt").
+    
+        Returns:
+            list: A list of file paths matching the extension.
+        """
+        matched_files = []
+        
+        for root, _, files in os.walk(dirToScan):
+            for file in files:
+                if file.endswith(ext):
+                    matched_files.append(os.path.abspath(os.path.join(root, file)))
+        
+        return matched_files
         
     def _buildCallerPath(self, parentOnly=0):
         stack = inspect.stack()
@@ -602,16 +663,17 @@ def GetKTools(appName=None, customLookUp=None, customJsonConfigFile=None) -> KTo
         Creates single tool instance common for entire project.
         Optional you can provide custom lookups and configs
     """
-    if not appName: appName = os.path.basename(sys.argv[0])
-    appName = appName.strip().lower().replace('.py','').replace(' ','').upper()
     
     gblKey = 'KAppName'
     gbl = globals()
-    currentApp = gbl[gblKey] if gblKey in gbl else appName    
+    if gblKey in gbl: appName = gbl[gblKey]        
+    if not appName: appName = os.path.basename(sys.argv[0])
+    currentApp = appName.strip().lower().replace('.py','').replace(' ','').upper()
+    
     if currentApp:
         if currentApp in gbl:
             tls = gbl[currentApp]
-            tls.debug(f"Using existent ktool instance for app: {currentApp}")
+            #tls.debug(f"Using existent ktool instance for app: {currentApp}")
         else:
             print(f"Creating new ktool instance for app: {currentApp}")
             gbl[currentApp] = KTools(customLookUp, customJsonConfigFile, currentApp)

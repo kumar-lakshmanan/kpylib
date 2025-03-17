@@ -5,7 +5,7 @@ KTools Configuration
 All CONSTANTS, STRING HARD CODES. SETTINGS ARE PRESENT HERE
 
 #Usage (Via KTOOLS):
-self.lookUp = self.setUpLookUp(customPyLookUp)
+self.lookUp = self.tls.setUpLookUp(customPyLookUp)
 self.lookUp.JsonConfigFile
 
 #Also:
@@ -18,7 +18,7 @@ __desc__ = 'KDefault App - Default template for any apps'
 __creater__ = 'Kumaresan Lakshmanan'
 __date__ = '2025-01-12'
 __version__ = '0.0.1'
-__updated__ = '2025-01-12'
+__updated__ = '2025-03-09'
 __release__ = 'Test'
 
 versionStr = "v%s" % __version__
