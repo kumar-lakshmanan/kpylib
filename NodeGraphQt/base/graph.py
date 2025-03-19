@@ -328,7 +328,7 @@ class NodeGraph(QtCore.QObject):
             node_id (str): node id emitted by the viewer.
         """
         node = self.get_node_by_id(node_id)
-        self.node_selected.emit(node)
+        if node: self.node_selected.emit(node)
 
     def _on_node_selection_changed(self, sel_ids, desel_ids):
         """

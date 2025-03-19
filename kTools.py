@@ -636,7 +636,7 @@ def handleUnknownException(expType, expVal, traceBack):
         errorContent = f"\nError happend on {strftime('%Y-%m-%d %I:%M:%S %p')}\n{lastErrorInfo}"
         try:
             print(f'--------\n{errorContent}--------')
-            f = open(f"error_{strftime('%Y%m%d%H%M%S')}.log", "w")
+            f = open(f"error_{strftime('%Y%m%d')}.log", "a")
             f.write(errorContent)
             f.close()
             sys.exit()
