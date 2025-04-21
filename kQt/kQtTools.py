@@ -13,6 +13,7 @@ import fatcow_rc
 import kTools
 import functools
 from PyQt5.Qt import QPlainTextEdit
+import os,sys,pickle
 class KQTTools():
     def __init__(self, parentWindow=None, iconPath='D:/Akelpads/AkelFiles/Icons/'):
         self.tls = kTools.GetKTools()
@@ -21,6 +22,67 @@ class KQTTools():
         self.IconPath = iconPath
         self.defaultIcon = "document_empty.png"
         
+    def uiLayoutSave(self, layoutFile='layout.lyt', additionalObjToSaveStates=None, saveThisList=[]):
+        dirname = os.path.dirname(layoutFile)
+        if dirname!='' and not os.path.exists(dirname):
+            os.makedirs(dirname)
+
+        win={}
+        win['state']=self.CallingUI.saveState()
+        win['size']=self.CallingUI.size()
+        win['pos']=self.CallingUI.pos()
+        
+        additionalObjs=[]
+        if additionalObjToSaveStates:
+            for each in additionalObjToSaveStates:
+                splt={}
+                splt['state']=each.saveState()
+                additionalObjs.append(splt)
+
+        data={}
+        data['win']=win
+        data['added']=additionalObjs
+        data['mylist']=saveThisList
+        data['ismax']=self.CallingUI.isMaximized()
+        
+        with open(layoutFile, 'wb') as handle:
+            pickle.dump(data, handle)
+
+    def uiLayoutRestore(self,layoutFile='layout.lyt',additionalObjToRestoreStates=None):
+        if os.path.exists(layoutFile):
+            with open(layoutFile, 'rb') as handle:
+                data=pickle.load(handle)            
+                
+            win=data['win']               
+            self.CallingUI.restoreState(win['state'])
+            self.CallingUI.resize(win['size'])
+            self.CallingUI.move(win['pos'])
+            
+            ismaxed = data['ismax'] if 'ismax' in data else 0
+            if ismaxed:
+                self.CallingUI.showMaximized()
+            
+            dcksObj = []
+            sptsObj = []
+            for each in self.CallingUI.children():
+                if isinstance(each,QtWidgets.QDockWidget):
+                    dcksObj.append(each)
+                elif isinstance(each,QtWidgets.QSplitter):
+                    sptsObj.append(each)
+            
+#             dcks=data['dcks']
+#             for cnt, each in enumerate(range(len(dcksObj),0,-1)):
+#                 dcksObj[cnt].resize(dcks[cnt]['size'])
+#                 dcksObj[cnt].move(dcks[cnt]['pos'])
+
+            added=data['added']
+            if additionalObjToRestoreStates:
+                for cnt, each in enumerate(range(0,len(additionalObjToRestoreStates))):
+                    additionalObjToRestoreStates[cnt].restoreState(added[cnt]['state'])
+        
+            return data['mylist']
+        return None
+
     def swapWidget(self, holderObj, oldObj, newObj):
         '''
         Remove old widget from holder widget and new widget to the holder widget
@@ -38,11 +100,11 @@ class KQTTools():
         - `data`: Dictionary containing key-value pairs.
         - `apply_callback`: Function that will be called when Apply button is clicked, with the table as an argument.
         """
-        
-        while parent.layout().count():
-            item = parent.layout().takeAt(0)            
-            parent.layout().removeWidget(item.widget())
-            del(item)
+        if parent.layout():
+            while parent.layout().count():
+                item = parent.layout().takeAt(0)            
+                parent.layout().removeWidget(item.widget())
+                del(item)
             
         # Create Table
         table = QtWidgets.QTableWidget(parent)
@@ -156,6 +218,23 @@ class KQTTools():
         mainWin.setLayout(layout)    
         mainWin.setWindowTitle(name)     
         return (mainWin,layout,btnList) 
+
+    def showInputBox(self, Title='Information', Message='Information', DefaultValue=''):
+        comments, ok = QtWidgets.QInputDialog.getText(self.CallingUI, str(Title), str(Message), QtWidgets.QLineEdit.Normal, DefaultValue)
+        if ok:
+            return comments
+        else:
+            return ''    
+
+    def getFile(self, Title='Select a file to open...', FileName='Select File', FileType='All Files (*);;Excel Files (*.xls);;Text Files (*.txt)'):
+        fileName = QtWidgets.QFileDialog.getOpenFileName(self.CallingUI, str(Title), FileName, str(FileType))
+        if(fileName[0] == ""): return ""
+        return fileName[0]
+
+    def getFileToSave(self, Title='Select a file to save...', FileName='Select File', FileType='All Files (*);;Excel Files (*.xls);;Text Files (*.txt)'):
+        fileName = QtWidgets.QFileDialog.getSaveFileName(self.CallingUI, str(Title), FileName, str(FileType))
+        if(fileName[0] == ""): return ""
+        return fileName[0]
     
     def getIconString(self, iconName='document_empty.ico', alternateIcon='document_empty.ico'):
         """
@@ -242,7 +321,7 @@ class KQTTools():
         if(icon):
             itm = QAction(self.getIcon(icon), name, parent)
         else:
-            itm = QAction(name, parent)
+            itm = QAction(name, parent)            
              
         itm.setStatusTip(description)
         itm.triggered.connect(fn)

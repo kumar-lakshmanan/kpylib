@@ -23,6 +23,7 @@ import json
 import datetime
 import zipfile
 
+import kCodeExecuter
 import kToolsDefaultLookUps
 from pickle import NONE
 
@@ -81,6 +82,10 @@ class KTools(object):
         
         self.randomSeed = self.lookUp.randomSeed + int(self.getDateTime('%I%M%S'))
         self.rand = random.Random(self.randomSeed)
+        
+        self.noLogPrintOnly = False
+        
+        self.console = kCodeExecuter.KCodeExecuter(self)
                     
     def isAppNameValid(self, appName):
         #AppName - FileName - Should be more then 5 and less then 25 char. 
@@ -174,27 +179,37 @@ class KTools(object):
         return str(key).strip().ljust(justify, justfyChar) + str(value).strip() 
     
     def info(self, msg, skipLevel=2): 
-        msg = self._logFormatter(msg, skipLevel)   
-        self.logSys.info(msg)
-
+        msg = self._logFormatter(msg, skipLevel)           
+        print(msg) if self.noLogPrintOnly else self.logSys.info(msg)
 
     def debug(self, msg, skipLevel=2):
         msg = self._logFormatter(msg, skipLevel)
-        self.logSys.debug(msg)
-
+        print(msg) if self.noLogPrintOnly else self.logSys.debug(msg)
 
     def warn(self, msg, skipLevel=2):
         msg = self._logFormatter(msg, skipLevel)
-        self.logSys.warning(msg)
-
+        print(msg) if self.noLogPrintOnly else self.logSys.warning(msg)
 
     def error(self, msg, skipLevel=2):
         msg = self._logFormatter(msg, skipLevel)
-        self.logSys.error(msg) if hasattr(self, 'logSys') and self.logSys else print(msg) 
+        if self.noLogPrintOnly:
+            print(msg)
+        else: 
+            self.logSys.error(msg) if hasattr(self, 'logSys') and self.logSys else print(msg) 
 
+    def errorAndExit(self, msg, skipLevel=2):
+        msg = self._logFormatter(msg, skipLevel)
+        if self.noLogPrintOnly:
+            print(msg)
+        else:        
+            self.logSys.error(msg) if hasattr(self, 'logSys') and self.logSys else print(msg)
+        sys.exit(-1)
 
-    def shellExecute(self, command):
+    def shellExecuteWait(self, command):
         subprocess.call(command)
+
+    def shellExecuteNoBlock(self, command):
+        subprocess.Popen(command)
 
     def raiseError(self, msg='Technical Error'):
         self.error(f"Technical Error: {msg}")
@@ -210,9 +225,10 @@ class KTools(object):
             errorContent = f"\nError happend on {strftime('%Y-%m-%d %I:%M:%S %p')}\n{lastErrorInfo}"
         else:
             errorContent = f"\nNo system error on {strftime('%Y-%m-%d %I:%M:%S %p')}"        
-        self.error(errorContent, 4) if hasattr(self, 'logSys') else print(errorContent)        
-        fileName = f"error_{strftime('%Y%m%d%H%M%S')}.log"
-        self.writeFileContent(fileName, errorContent)
+        self.error(errorContent, 4) if hasattr(self, 'logSys') else print(errorContent)
+        #print(errorContent)        
+        fileName = f"error_{strftime('%Y%m%d')}.log"
+        self.writeFileContent(fileName, errorContent, 'a')
 
     def doEntryStartUp(self):
         self.info(f"Starting app {self.appName} startup activity....")
@@ -354,6 +370,25 @@ class KTools(object):
             infos.append([mem, tp, eachMember[1]])
         return infos
 
+    def convertDictStrToDict(self, strDict):
+        return json.loads(strDict)
+
+    def convertDictToDictStr(self, dictObj):
+        return json.dumps(dictObj)
+    
+    def isNotPresentInDict(self, inThisDict, checkForThis):
+        return not checkForThis in inThisDict.keys()
+
+    def addOnlyUniqueToDict(self, inThisDict, keyToAdd, valueToAdd, forceAddLatest=0):
+        if self.isNotPresentInDict(inThisDict, keyToAdd):
+            inThisDict[keyToAdd] = valueToAdd
+        else:
+            if forceAddLatest:
+                inThisDict[keyToAdd] = valueToAdd    
+                self.error(f"{keyToAdd} is not unique. Updating same with new value!")
+            else:
+                self.error(f"{keyToAdd} is not unique. Not adding new!")
+        
     def getConfigFile(self, customJsonConfigFile=None):
         """
             Returns config file to be used.
@@ -440,8 +475,8 @@ class KTools(object):
         f.close()
         return content
 
-    def writeFileContent(self, fileName, data):
-        f = open(fileName, 'w')
+    def writeFileContent(self, fileName, data, mode='w'):
+        f = open(fileName, mode)
         f.write(str(data))
         f.close()
 
@@ -508,9 +543,12 @@ class KTools(object):
         except PermissionError:
             self.debug("Force delete: " + fpath)
             subprocess.run(["cmd", "/c", "del", "/F", "/Q", fpath], shell=False)
-        
+            
+    def isListedItemPresentInText(self, lookUpList = [], searchInText=""):
+        checkIsPresent = lambda lookUpList, searchInText: any(word in searchInText for word in lookUpList)
+        return checkIsPresent(lookUpList, searchInText)
 
-    def getFileList(self, dirToScan, ext=".py"):
+    def getFileList(self, dirToScan, ext=".py", allowed=[], disallowed=[]):
         """Recursively lists all files with the given extension in a directory and its subdirectories.
     
         Args:
@@ -524,8 +562,15 @@ class KTools(object):
         
         for root, _, files in os.walk(dirToScan):
             for file in files:
-                if file.endswith(ext):
-                    matched_files.append(os.path.abspath(os.path.join(root, file)))
+                if file.endswith(ext):                    
+                    if allowed and disallowed and self.isListedItemPresentInText(allowed, file) and not self.isListedItemPresentInText(disallowed, file):
+                        matched_files.append(os.path.abspath(os.path.join(root, file)))
+                    elif allowed and not disallowed and self.isListedItemPresentInText(allowed, file): 
+                        matched_files.append(os.path.abspath(os.path.join(root, file)))
+                    elif not allowed and disallowed and not self.isListedItemPresentInText(disallowed, file):
+                        matched_files.append(os.path.abspath(os.path.join(root, file)))
+                    elif not allowed and not disallowed:
+                        matched_files.append(os.path.abspath(os.path.join(root, file)))
         
         return matched_files
         
