@@ -1,20 +1,24 @@
 {
 	"general" : {
 					"timeStampFormat" : "%Y%m%d%H%M%S",
-					"dateTimeFormat" : "%Y-%m-%d %I:%M:%S %p"					
+					"dateTimeFormat" : "%Y-%m-%d %I:%M:%S %p",
+					"uselivedata" : 0,
+					"hostname": "MUKUND_PC"
 				},
 	"logging" : {
 					"logDisable" : 0,
-					"logLevel" : "DEBUG",
+					"logLevel" : "INFO",
 					"logDateTimeFormat2" : "%Y-%m-%d %I:%M:%S%p",
 					"logDateTimeFormat" : "%I:%M:%S%p",
 					"logFormat": "[%(asctime)s]%(levelname).1s:%(message)s",
 					"logToConsole" : 1,
 					"logToFile" : 1,
 					"logFile" : "output.log",
-					"logModuleName" : 0
+					"logModuleName" : 0,
+					"logProdMode" : 0
 				},
 	"folders" : {
-					"temp" : "C:/TEMP" 
+					"temp" : "C:/TEMP" ,
+					"cache" : "C:/TEMP/ktools/cache"
 				}
 }

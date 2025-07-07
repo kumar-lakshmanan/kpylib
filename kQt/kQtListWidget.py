@@ -1,9 +1,6 @@
-import os
-
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-
-class TreeWidget(object):
+class ListWidget(object):
 
     def __init__(self):
         '''
@@ -12,14 +9,20 @@ class TreeWidget(object):
         pass
 
     def createItem(self, Text='', Data=''):
-        itm = QtWidgets.QTreeWidgetItem()
+        itm = QtWidgets.QListWidgetItem()
         itm.setText(0, str(Text))
         itm.setData(0, QtCore.Qt.UserRole, QtCore.QVariant(str(Data)))
         return itm
+    
+    def addItem(self, lstWidget, label, index=0):
+        lstWidget2 = QtWidgets.QListWidget()
+        lstWidget.insertItem(index, label)
+        lstWidget2.clear()
+        lstWidget2.addItem(label)
+        
 
     def getRootItems(self, Tree):
-        tree = QtWidgets.QTreeWidget()       
-        
+        # Tree = QtWidgets.QTreeWidget()
         items = []
         for i in range(0, Tree.topLevelItemCount()):
             item = Tree.topLevelItem(i)
@@ -27,22 +30,7 @@ class TreeWidget(object):
         return items
 
     def addNewRoot(self, treeWidget, item):
-        treeWidget.addTopLevelItem(item)
-        return item
-
-    def addNewRootLast(self, treeWidget, item, index=0):
-        #treeWidget.addTopLevelItem(item)
-        treeWidget.insertTopLevelItem(index, item)
-        return item
-
-    def addChild(self, childItem, parentItem):
-        return parentItem.addChild(childItem)
-
-    def addItem(self, treeWidget, item2Add, parentItem=None):
-        if(parentItem is None):
-            return self.addNewRoot(treeWidget, item2Add)
-        else:
-            return self.addChild(item2Add, parentItem)
+        return treeWidget.addTopLevelItem(item)
 
     def getSelectedItem(self, TreeName, SingleSelection=1, col=0):
         # x = QtGui.QTreeWidget()

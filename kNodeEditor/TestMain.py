@@ -4,11 +4,10 @@ Created on 23-Jan-2025
 @author: kayma
 '''
 import sys
-from PyQt5 import QtCore, QtGui, Qsci, QtWidgets
+from PyQt5 import QtWidgets
 
 import kTools
-from kNodeEditor.kneLib import KNELib 
-from kQt.kQtTools import KQTTools
+from kNodeEditor.kneLib import KNELib
 from kQt.kTestWin import TestWindowRunner
 
 from NodeGraphQt import NodeGraph

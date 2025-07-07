@@ -3,95 +3,78 @@ Created on 17-Jan-2025
 
 @author: kayma
 '''
-from PyQt5 import QtCore, QtGui, Qsci, QtWidgets
-from PyQt5.Qsci import (QsciScintilla, QsciLexerPython)
-from PyQt5.Qt import QLineEdit
-from PyQt5.QtCore import (QFile, QFileInfo, QPoint, QSettings, QSignalMapper, QSize, QTextStream, Qt,)
-from PyQt5.QtGui import (QIcon, QKeySequence, QFont, QColor)
-from PyQt5.QtWidgets import (QAction, QApplication, QFileDialog, QMainWindow, QMdiArea, QMessageBox, QTextEdit, QWidget, QSpinBox)
-import fatcow_rc
+__updated__ = "2025-07-07"
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import (QAction, QVBoxLayout)
+from PyQt5.uic import loadUi
 import kTools
 import functools
-from PyQt5.Qt import QPlainTextEdit
-import os,sys,pickle
-class KQTTools():
-    def __init__(self, parentWindow=None, iconPath='D:/Akelpads/AkelFiles/Icons/'):
-        self.tls = kTools.GetKTools()
 
+import os, pickle
+
+class KQTTools():
+    
+    def __init__(self, parentWindow=None, iconPath='G:/resources/Icons/'):
+        self.tls = kTools.KTools()
         self.CallingUI = parentWindow
         self.IconPath = iconPath
         self.defaultIcon = "document_empty.png"
         
-    def uiLayoutSave(self, layoutFile='layout.lyt', additionalObjToSaveStates=None, saveThisList=[]):
-        dirname = os.path.dirname(layoutFile)
-        if dirname!='' and not os.path.exists(dirname):
-            os.makedirs(dirname)
-
-        win={}
-        win['state']=self.CallingUI.saveState()
-        win['size']=self.CallingUI.size()
-        win['pos']=self.CallingUI.pos()
-        
-        additionalObjs=[]
-        if additionalObjToSaveStates:
-            for each in additionalObjToSaveStates:
-                splt={}
-                splt['state']=each.saveState()
-                additionalObjs.append(splt)
-
-        data={}
-        data['win']=win
-        data['added']=additionalObjs
-        data['mylist']=saveThisList
-        data['ismax']=self.CallingUI.isMaximized()
-        
-        with open(layoutFile, 'wb') as handle:
-            pickle.dump(data, handle)
-
-    def uiLayoutRestore(self,layoutFile='layout.lyt',additionalObjToRestoreStates=None):
-        if os.path.exists(layoutFile):
-            with open(layoutFile, 'rb') as handle:
-                data=pickle.load(handle)            
-                
-            win=data['win']               
-            self.CallingUI.restoreState(win['state'])
-            self.CallingUI.resize(win['size'])
-            self.CallingUI.move(win['pos'])
-            
-            ismaxed = data['ismax'] if 'ismax' in data else 0
-            if ismaxed:
-                self.CallingUI.showMaximized()
-            
-            dcksObj = []
-            sptsObj = []
-            for each in self.CallingUI.children():
-                if isinstance(each,QtWidgets.QDockWidget):
-                    dcksObj.append(each)
-                elif isinstance(each,QtWidgets.QSplitter):
-                    sptsObj.append(each)
-            
-#             dcks=data['dcks']
-#             for cnt, each in enumerate(range(len(dcksObj),0,-1)):
-#                 dcksObj[cnt].resize(dcks[cnt]['size'])
-#                 dcksObj[cnt].move(dcks[cnt]['pos'])
-
-            added=data['added']
-            if additionalObjToRestoreStates:
-                for cnt, each in enumerate(range(0,len(additionalObjToRestoreStates))):
-                    additionalObjToRestoreStates[cnt].restoreState(added[cnt]['state'])
-        
-            return data['mylist']
-        return None
-
-    def swapWidget(self, holderObj, oldObj, newObj):
+    def getFormInput(self, inputDictForm, parent=None, title="KQt"):
         '''
-        Remove old widget from holder widget and new widget to the holder widget
-        Holder widget should be layout. For different types need to extend.  
+        Give kvpair of items. and it will be placed in editable list as a form and will be provided for user input. 
+        On close, you will get updated output
+        inputDIctForm = {}
+        '''        
+        if not parent: parent = self.CallingUI
+        outputDict = {}
+        def dataFetcher(tbl, winObj):
+            nonlocal outputDict        
+            for row in range(tbl.rowCount()):
+                key = tbl.item(row, 0).text()  # Property name (column 1)
+                value = tbl.item(row, 1).text()  # User-edited value (column 2)
+                outputDict[key] = value  
+            winObj.close()
+        winObj = QtWidgets.QDialog(parent)
+        winObj.setWindowTitle(title)
+        layout = QVBoxLayout()
+        winObj.setLayout(layout)
+        self.createPropEditor(winObj, inputDictForm, dataFetcher, winObj) 
+        winObj.exec_()
+        return outputDict
+    
+    def createUiDialog(self, uiFileName, parent=None, title="KQt", advParam={}):
         '''
-        holderObj.removeWidget(oldObj)
-        oldObj.deleteLater()
-        holderObj.addWidget(newObj, 0, 0)     
-        
+            Creates a UI Dialog window with given UI file. and returns the dialogWin and uiObjCollection.
+            Use "showUiDialog" fn for displaying the dialog window . After you do all your UI modificaitons.
+        '''
+        isModel = self.tls.getSafeDictValue(advParam, "isModel", True)
+        winObj = None
+        uiObject = None
+        if uiFileName and self.tls.isFileExists(uiFileName):
+            if not parent: parent = self.CallingUI
+            winObj = QtWidgets.QDialog(parent)
+            uiObject = loadUi(uiFileName, winObj)
+            uiObject.setModal(isModel)
+            winObj.setWindowTitle(title)            
+        else:
+            self.tls.error(f"UI file [{uiFileName}] doesn't exist.")
+        return winObj, uiObject
+    
+    def showUiDialog(self, winObj, advParam={}):
+        '''
+            Show the ui winobj. Mostly used with "createUiDialog" fn
+        '''
+        try:
+            isModel = self.tls.getSafeDictValue(advParam, "isModel", True)
+            if isModel:            
+                winObj.exec_()
+            else:
+                winObj.show()
+        except Exception as e:
+            print(self.tls.getLastErrorInfo())
+            
     def createPropEditor(self, parent: QtWidgets.QFrame, data: dict, apply_callback, metaData=None):
         """
         Creates a QTableWidget inside the given parent frame with editable key-value pairs.
@@ -141,67 +124,6 @@ class KQTTools():
         parent.layout().addWidget(apply_button)
         return table  # Return the table widget (if needed)          
 
-    def uiRefresh(self):
-        for _ in range(3):  # ✅ Calls it multiple times to ensure proper refresh
-            self.tls.qapp.processEvents()
-            QtWidgets.QApplication.processEvents()
-
-    def cleanChildren(self, parent):
-        if len(parent.children()):
-            for each in parent.children():
-                each.deleteLater()
-                self.uiRefresh()        
-                
-    def clearLayout(self, parent):
-        """Remove all widgets and layout from the parent before adding a new form."""
-        
-        for each in parent.children():
-            each.deleteLater()
-        
-        if isinstance(parent, QtWidgets.QWidget):  # ✅ Ensure it's a QWidget before setting layout
-            old_layout = parent.layout()
-        elif isinstance(parent, QtWidgets.QLayout):  # ✅ Directly clear layout if parent is a layout
-            old_layout = parent
-        else:
-            return  # Not a valid layout holder
-    
-        if old_layout:
-            parent.setLayout(QtWidgets.QVBoxLayout())
-            self.cleanChildren(parent)
-            self.cleanChildren(old_layout)
-            self.uiRefresh()
-            while old_layout.count():
-                item = old_layout.takeAt(0)
-                if item and (item.widget() or item.layout()):
-                    if item.widget(): old_layout.removeWidget(item.widget())
-                    if item.layout(): old_layout.removeItem(item.layout())
-                    if item.widget(): item.widget().deleteLater()  # ✅ Remove widget
-                    if item.layout(): item.layout().deleteLater()  # ✅ Remove widget
-                
-                parent.update()
-                self.uiRefresh()                 
-                QtCore.QTimer.singleShot(1, parent.update)
-                QtCore.QTimer.singleShot(1, parent.repaint)                
-                self.uiRefresh()         
-            
-            if old_layout:
-                old_layout.invalidate()
-                old_layout.disconnectNotify() 
-                old_layout.deleteLater()  # ✅ Delete the layout
-            
-            self.cleanChildren(parent)
-            self.cleanChildren(old_layout.parent())
-            parent.setLayout(QtWidgets.QVBoxLayout())
-                                            
-            parent.update()
-            self.uiRefresh()         
-            
-            if isinstance(parent, QtWidgets.QWidget):  # ✅ Only set layout if parent is a QWidget
-                parent.setLayout(QtWidgets.QVBoxLayout())  # ✅ Set an empty layout to refresh UI
-                parent.update()                
-                            
-            self.uiRefresh() 
-
     def createVerticalWindow(self, parent, name='SystemDialog', buttons=['Button1','Button2','|','Button3']):
         mainWin = QtWidgets.QDialog(parent)        
         layout = QtWidgets.QVBoxLayout(mainWin)        
@@ -224,7 +146,11 @@ class KQTTools():
         if ok:
             return comments
         else:
-            return ''    
+            return ''
+            
+    def showYesNoBox(self, Title='Information', Message='Information'):
+        ret = QtWidgets.QMessageBox.question(self.CallingUI, Title, Message, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
+        return ret == QtWidgets.QMessageBox.Yes
 
     def getFile(self, Title='Select a file to open...', FileName='Select File', FileType='All Files (*);;Excel Files (*.xls);;Text Files (*.txt)'):
         fileName = QtWidgets.QFileDialog.getOpenFileName(self.CallingUI, str(Title), FileName, str(FileType))
@@ -310,6 +236,141 @@ class KQTTools():
             item.setItemIcon (comboBoxIndex, icon)    
 
 
+    def uiLayoutSave(self, layoutFile='layout.lyt', additionalObjToSaveStates=None, saveThisList=[]):
+        dirname = os.path.dirname(layoutFile)
+        if dirname!='' and not os.path.exists(dirname):
+            os.makedirs(dirname)
+
+        win={}
+        win['state']=self.CallingUI.saveState()
+        win['size']=self.CallingUI.size()
+        win['pos']=self.CallingUI.pos()
+        
+        additionalObjs=[]
+        if additionalObjToSaveStates:
+            for each in additionalObjToSaveStates:
+                splt={}
+                splt['state']=each.saveState()
+                additionalObjs.append(splt)
+
+        data={}
+        data['win']=win
+        data['added']=additionalObjs
+        data['mylist']=saveThisList
+        data['ismax']=self.CallingUI.isMaximized()
+        
+        with open(layoutFile, 'wb') as handle:
+            pickle.dump(data, handle)
+
+    def uiLayoutRestore(self,layoutFile='layout.lyt',additionalObjToRestoreStates=None):
+        if os.path.exists(layoutFile):
+            with open(layoutFile, 'rb') as handle:
+                data=pickle.load(handle)            
+                
+            win=data['win']               
+            self.CallingUI.restoreState(win['state'])
+            self.CallingUI.resize(win['size'])
+            self.CallingUI.move(win['pos'])
+            
+            ismaxed = data['ismax'] if 'ismax' in data else 0
+            if ismaxed:
+                self.CallingUI.showMaximized()
+            
+            dcksObj = []
+            sptsObj = []
+            for each in self.CallingUI.children():
+                if isinstance(each,QtWidgets.QDockWidget):
+                    dcksObj.append(each)
+                elif isinstance(each,QtWidgets.QSplitter):
+                    sptsObj.append(each)
+            
+#             dcks=data['dcks']
+#             for cnt, each in enumerate(range(len(dcksObj),0,-1)):
+#                 dcksObj[cnt].resize(dcks[cnt]['size'])
+#                 dcksObj[cnt].move(dcks[cnt]['pos'])
+
+            added=data['added']
+            if additionalObjToRestoreStates:
+                for cnt, each in enumerate(range(0,len(additionalObjToRestoreStates))):
+                    additionalObjToRestoreStates[cnt].restoreState(added[cnt]['state'])
+        
+            return data['mylist']
+        return None
+
+    def swapWidget(self, holderObj, oldObj, newObj):
+        '''
+        Remove old widget from holder widget and new widget to the holder widget
+        Holder widget should be layout. For different types need to extend.  
+        '''
+        holderObj.removeWidget(oldObj)
+        oldObj.deleteLater()
+        holderObj.addWidget(newObj, 0, 0)     
+
+    def uiRefresh(self):
+        for _ in range(3):  # ✅ Calls it multiple times to ensure proper refresh
+            self.tls.qapp.processEvents()
+            QtWidgets.QApplication.processEvents()    
+                
+    def clearLayout(self, parent):
+        """Remove all widgets and layout from the parent before adding a new form."""
+        
+        for each in parent.children():
+            each.deleteLater()
+        
+        if isinstance(parent, QtWidgets.QWidget):  # ✅ Ensure it's a QWidget before setting layout
+            old_layout = parent.layout()
+        elif isinstance(parent, QtWidgets.QLayout):  # ✅ Directly clear layout if parent is a layout
+            old_layout = parent
+        else:
+            return  # Not a valid layout holder
+    
+        if old_layout:
+            parent.setLayout(QtWidgets.QVBoxLayout())
+            self.cleanChildren(parent)
+            self.cleanChildren(old_layout)
+            self.uiRefresh()
+            while old_layout.count():
+                item = old_layout.takeAt(0)
+                if item and (item.widget() or item.layout()):
+                    if item.widget(): old_layout.removeWidget(item.widget())
+                    if item.layout(): old_layout.removeItem(item.layout())
+                    if item.widget(): item.widget().deleteLater()  # ✅ Remove widget
+                    if item.layout(): item.layout().deleteLater()  # ✅ Remove widget
+                
+                parent.update()
+                self.uiRefresh()                 
+                QtCore.QTimer.singleShot(1, parent.update)
+                QtCore.QTimer.singleShot(1, parent.repaint)                
+                self.uiRefresh()         
+            
+            if old_layout:
+                old_layout.invalidate()
+                old_layout.disconnectNotify() 
+                old_layout.deleteLater()  # ✅ Delete the layout
+            
+            self.cleanChildren(parent)
+            self.cleanChildren(old_layout.parent())
+            parent.setLayout(QtWidgets.QVBoxLayout())
+                                            
+            parent.update()
+            self.uiRefresh()         
+            
+            if isinstance(parent, QtWidgets.QWidget):  # ✅ Only set layout if parent is a QWidget
+                parent.setLayout(QtWidgets.QVBoxLayout())  # ✅ Set an empty layout to refresh UI
+                parent.update()                
+                            
+            self.uiRefresh() 
+
+    def cleanChildren(self, parent):
+        if len(parent.children()):
+            for each in parent.children():
+                each.deleteLater()
+                self.uiRefresh()    
+                
+    def listAdder(self, listWidgetObj, text):
+        itm = QtWidgets.QListWidgetItem(text.strip())
+        listWidgetObj.addItem(itm)         
+                
     def connectToRightClick(self, Widget, FunctionToInvoke):
         self.enableRightClick(Widget)
         Widget.customContextMenuRequested.connect(FunctionToInvoke)
@@ -328,7 +389,6 @@ class KQTTools():
         itm.setCheckable(checkable)
         itm.setChecked(checked)
         return itm  
-
 
     def popUpMenu(self, menuRequestingtObject, PopupPoint, menuListString, funcToInvoke, additionalArguments='', iconList = []):
 

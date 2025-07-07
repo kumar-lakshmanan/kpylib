@@ -1,0 +1,17 @@
+# Function dependencies, for example:
+# package>=version
+requests
+BeautifulSoup4
+python-binance
+google-cloud-storage
+notify-run
+twitter
+regex
+scikit-learn
+sklearn-pandas
+lxml
+feedparser
+html2text
+google-cloud-functions
+csv23
+boto3

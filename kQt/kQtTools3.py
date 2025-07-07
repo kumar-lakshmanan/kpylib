@@ -3,19 +3,16 @@ Created on 17-Jan-2025
 
 @author: kayma
 '''
-from PyQt5 import QtCore, QtGui, Qsci, QtWidgets
-from PyQt5.Qsci import (QsciScintilla, QsciLexerPython)
+from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.Qt import QLineEdit
-from PyQt5.QtCore import (QFile, QFileInfo, QPoint, QSettings, QSignalMapper, QSize, QTextStream, Qt,)
-from PyQt5.QtGui import (QIcon, QKeySequence, QFont, QColor)
-from PyQt5.QtWidgets import (QAction, QApplication, QFileDialog, QMainWindow, QMdiArea, QMessageBox, QTextEdit, QWidget, QSpinBox)
-import fatcow_rc
+from PyQt5.QtWidgets import (QAction, QApplication)
 import kTools
 import functools
-from PyQt5.Qt import QPlainTextEdit
+
+
 class KQTTools():
     def __init__(self, parentWindow=None, iconPath='D:/Akelpads/AkelFiles/Icons/'):
-        self.tls = kTools.GetKTools()
+        self.tls = kTools.KTools()
 
         self.CallingUI = parentWindow
         self.IconPath = iconPath

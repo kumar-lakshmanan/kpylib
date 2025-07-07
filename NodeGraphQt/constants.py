@@ -1,5 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+__updated__ = "2025-07-07"
+
 import os
 
 from Qt import QtWidgets

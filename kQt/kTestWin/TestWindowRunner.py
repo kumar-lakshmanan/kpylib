@@ -3,15 +3,9 @@ Created on 23-Jan-2025
 
 @author: kayma
 '''
-import os
 import sys
 
-from PyQt5 import QtCore, QtGui, Qsci, QtWidgets
-from PyQt5.QtCore import (QFile, QFileInfo, QPoint, QSettings, QSignalMapper, QSize, QTextStream, Qt,)
-from PyQt5.QtWidgets import (QAction, QApplication, QFileDialog, QMainWindow, QMdiArea, QMessageBox, QTextEdit, QWidget,)
-from PyQt5.QtGui import (QIcon, QKeySequence, QFont, QColor)
-from PyQt5.Qsci import (QsciScintilla, QsciLexerPython)
-from PyQt5.Qt import QLineEdit
+from PyQt5 import QtWidgets
 from PyQt5.uic import loadUi
 
 import kTools
@@ -21,7 +15,7 @@ class WindowRunner(QtWidgets.QMainWindow):
 
     def __init__(self, parent = None):
         super().__init__()
-        self.tls = kTools.GetKTools()
+        self.tls = kTools.KTools()
         self.qtls = kQtTools.KQTTools()
         
         self.tls.info('Preparing GUI...')
@@ -50,7 +44,7 @@ class WindowRunner(QtWidgets.QMainWindow):
         
 
 if __name__ == "__main__":
-    tls = kTools.GetKTools()
+    tls = kTools.KTools()
     app = QtWidgets.QApplication(sys.argv)
     appwin = WindowRunner()
     appwin.show()
