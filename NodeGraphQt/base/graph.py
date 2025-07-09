@@ -136,7 +136,7 @@ class NodeGraph(QtCore.QObject):
         :class:`NodeGraphQt.BaseNode`
     :emits: triggered context menu, node object.
     """
-
+    
     def __init__(self, parent=None, **kwargs):
         """
         Args:

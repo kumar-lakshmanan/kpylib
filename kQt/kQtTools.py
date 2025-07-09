@@ -3,7 +3,7 @@ Created on 17-Jan-2025
 
 @author: kayma
 '''
-__updated__ = "2025-07-07"
+__updated__ = "2025-07-08"
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import (QAction, QVBoxLayout)
@@ -297,13 +297,13 @@ class KQTTools():
             return data['mylist']
         return None
 
-    def swapWidget(self, holderObj, oldObj, newObj):
+    def swapWidget(self, holderObj, oldObj, newObj, delete=1):
         '''
         Remove old widget from holder widget and new widget to the holder widget
         Holder widget should be layout. For different types need to extend.  
         '''
         holderObj.removeWidget(oldObj)
-        oldObj.deleteLater()
+        if delete: oldObj.deleteLater()
         holderObj.addWidget(newObj, 0, 0)     
 
     def uiRefresh(self):
