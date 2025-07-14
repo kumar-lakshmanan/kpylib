@@ -4,7 +4,7 @@ Created on 21-Mar-2025
 @author: kayma
 '''
 __created__ = "24-Apr-2025"
-__updated__ = "2025-07-07"
+__updated__ = "2025-07-14"
 __author__ = "kayma"
 
 import os, sys, time, json, importlib, code, inspect, types
@@ -67,12 +67,10 @@ class KCodeExecuter(object):
                 self.console.last_result = None
                 self.console.push(codeStr)
                 time.sleep(.01)
-            except SyntaxError:
-                self.tls.getLastErrorInfo()
-            except SystemExit:
-                self.tls.getLastErrorInfo()
-            except:
-                self.tls.getLastErrorInfo()
+            except Exception as e:
+                self.tls.error(e)
+            finally:
+                self.console.resetbuffer()
             return self.console.last_result
 
     def runCode(self, codeStr='', fileName="<input>"):
@@ -83,11 +81,8 @@ class KCodeExecuter(object):
                 self.updateLocals('__name__', '__main__')
                 self.console.runsource(codeStr, fileName, 'exec')
                 time.sleep(.01)
-            except SyntaxError:
-                print(sys.exc_info())
-            except SystemExit:
-                print(sys.exc_info())
-            except:
+            except Exception as e:
+                self.tls.error(e)                
                 print(sys.exc_info())
 
     def runScript(self, scriptFile=None):
@@ -107,7 +102,7 @@ class KCodeExecuter(object):
         for eachSysPath in sys.path:
             pth = os.path.abspath(eachSysPath)
             if not pth in existingPaths:
-                 existingPaths.append(pth)
+                existingPaths.append(pth)
         sys.path = existingPaths
         for each in newPaths:
             self.addToSysPath(each)
@@ -179,3 +174,11 @@ class KCodeExecuter(object):
 
 if __name__ == "__main__":
     t = KCodeExecuter()
+    res = t.runCommand("10+2")
+    print(res)
+    res = t.runCommand("10+42")
+    print(res)
+    res = t.runCommand("10/0")
+    print(res)    
+    res = t.runCommand("10+1")
+    print(res)        

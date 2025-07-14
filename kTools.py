@@ -87,7 +87,7 @@ tmp = tls.getSafeConfig(<list>, defaultValue)
 
 '''
 __created__ = "24-Apr-2025"
-__updated__ = "2025-07-07"
+__updated__ = "2025-07-14"
 __author__ = "kayma"
 
 import os, sys
@@ -149,7 +149,11 @@ def handleUnhandledExceptionExit(expType, expVal, traceBack):
         errorContent = f"\nError happend on {strftime('%Y-%m-%d %I:%M:%S %p')}\n{lastErrorInfo}"
         try:
             print(f'--------\n{errorContent}--------')
-            f = open(f"logs/error_{strftime('%Y%m%d')}.log", "a")
+            if os.path.exists('logs'):
+                fileName = f"logs/error_{strftime('%Y%m%d')}.log"
+            else:
+                fileName = f"error_{strftime('%Y%m%d')}.log"             
+            f = open(fileName, "a")
             f.write(errorContent)
             f.close()
             sys.exit()
@@ -652,7 +656,10 @@ class KTools(object):
         else:
             errorContent = f"\nNo system error on {strftime('%Y-%m-%d %I:%M:%S %p')}"
         self.error(errorContent, 4) if hasattr(self, 'logSys') else print(errorContent)
-        fileName = f"logs/error_{strftime('%Y%m%d')}.log"
+        if os.path.exists('logs'):
+            fileName = f"logs/error_{strftime('%Y%m%d')}.log"
+        else:
+            fileName = f"error_{strftime('%Y%m%d')}.log"            
         print("verify error log file:", fileName)
         self.writeFileContent(fileName, errorContent, 'a')
 
