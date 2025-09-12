@@ -3,7 +3,7 @@ Created on 17-Jan-2025
 
 @author: kayma
 '''
-__updated__ = "2025-07-08"
+__updated__ = "2025-09-08"
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import (QAction, QVBoxLayout)
@@ -27,7 +27,10 @@ class KQTTools():
         On close, you will get updated output
         inputDIctForm = {}
         '''        
-        if not parent: parent = self.CallingUI
+        if not parent and self.CallingUI: parent = self.CallingUI
+        if not parent:
+            self.tls.error("No parent window to attach form window!") 
+            return None
         outputDict = {}
         def dataFetcher(tbl, winObj):
             nonlocal outputDict        
@@ -44,12 +47,11 @@ class KQTTools():
         winObj.exec_()
         return outputDict
     
-    def createUiDialog(self, uiFileName, parent=None, title="KQt", advParam={}):
+    def createUiDialog(self, uiFileName, parent=None, title="KQt", isModel=True):
         '''
             Creates a UI Dialog window with given UI file. and returns the dialogWin and uiObjCollection.
             Use "showUiDialog" fn for displaying the dialog window . After you do all your UI modificaitons.
         '''
-        isModel = self.tls.getSafeDictValue(advParam, "isModel", True)
         winObj = None
         uiObject = None
         if uiFileName and self.tls.isFileExists(uiFileName):
@@ -62,12 +64,11 @@ class KQTTools():
             self.tls.error(f"UI file [{uiFileName}] doesn't exist.")
         return winObj, uiObject
     
-    def showUiDialog(self, winObj, advParam={}):
+    def showUiDialog(self, winObj, isModel=True):
         '''
             Show the ui winobj. Mostly used with "createUiDialog" fn
         '''
         try:
-            isModel = self.tls.getSafeDictValue(advParam, "isModel", True)
             if isModel:            
                 winObj.exec_()
             else:
@@ -147,7 +148,11 @@ class KQTTools():
             return comments
         else:
             return ''
-            
+
+    def showInformation(self, Title='Information', Message='Information'):
+        ret = QtWidgets.QMessageBox.information(self.CallingUI, Title, Message, QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Ok)
+        return ret
+                    
     def showYesNoBox(self, Title='Information', Message='Information'):
         ret = QtWidgets.QMessageBox.question(self.CallingUI, Title, Message, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
         return ret == QtWidgets.QMessageBox.Yes

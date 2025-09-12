@@ -87,7 +87,7 @@ tmp = tls.getSafeConfig(<list>, defaultValue)
 
 '''
 __created__ = "24-Apr-2025"
-__updated__ = "2025-07-14"
+__updated__ = "2025-08-07"
 __author__ = "kayma"
 
 import os, sys
@@ -113,6 +113,7 @@ import atexit
 import uuid
 import types
 import gc
+import ast
 
 try:
     from blinker import signal
@@ -442,9 +443,12 @@ class KTools(object):
         def pathToSysPath(inpPath):
             if inpPath and not inpPath=="":
                 inpPath = Path(inpPath)
-                inpPath = inpPath.resolve(strict=True)
-                if inpPath.is_dir() and not str(inpPath) in os.environ:
-                    sys.path.append(str(inpPath))
+                if os.path.exists(inpPath):
+                    inpPath = inpPath.resolve(strict=True)
+                    if inpPath.is_dir() and not str(inpPath) in os.environ:
+                        sys.path.append(str(inpPath))
+                else:
+                    self.warn(f"Add to syspath - invalid path {inpPath}")
 
         #0. Basic System Paths:
         pathToSysPath('.')
@@ -876,6 +880,12 @@ class KTools(object):
             if keyToLookUp in inpDict.keys():
                 return inpDict[keyToLookUp]
         return finValue
+    
+    def getSafeObject(self, mainObj, attrib, default=None):
+        if hasattr(mainObj, attrib):
+            return mainObj.attrib
+        else:
+            return default
 
     def getDictSpecifics(self, inputDict, *keys):
         newDict = {}
@@ -885,12 +895,6 @@ class KTools(object):
 
     def getDictFormatted(self, inputDict):
         return pprint.pprint(inputDict)
-
-    def convertDictStrToDict(self, strDict):
-        return json.loads(strDict)
-
-    def convertDictToDictStr(self, dictObj):
-        return json.dumps(dictObj)
 
     def addOnlyUniqueToDict(self, inThisDict, keyToAdd, valueToAdd, forceAddLatest=0):
         if self.isNotPresentInDict(inThisDict, keyToAdd):
@@ -940,6 +944,26 @@ class KTools(object):
 
     # ----------------------------------------------------------------------------
 
+    def convertStrToLiteralObject(self, inpString):
+        try:
+            return ast.literal_eval(inpString)
+        except Exception as e:
+            self.error(e)
+            return None
+
+    def convertDictStrToDict(self, strDict):
+        return json.loads(strDict)
+
+    def convertDictToDictStr(self, dictObj):
+        return json.dumps(dictObj)        
+
+    # ----------------------------------------------------------------------------
+    
+    def getSharedObj(self, objName, default=None):
+        return self.getSafeDictValue(self.share, objName, default)    
+
+    def setSharedObj(self, objName, objValue=None):
+        self.share[objName] = objValue
 
     def getDateDiff(self, date1, date2, format='%Y-%m-%d'):
         '''

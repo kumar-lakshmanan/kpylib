@@ -4,11 +4,12 @@ Created on 21-Mar-2025
 @author: kayma
 '''
 __created__ = "24-Apr-2025"
-__updated__ = "2025-07-14"
+__updated__ = "2025-07-15"
 __author__ = "kayma"
 
-import os, sys, time, json, importlib, code, inspect, types
-import kTools
+import os, sys, time, json, importlib, code, inspect, types, atexit, traceback
+from time import strftime
+from kTools import KTools
 
 # Single line console command capture response and give back on demand
 class CapturingConsole(code.InteractiveConsole):
@@ -30,16 +31,26 @@ class CapturingConsole(code.InteractiveConsole):
         finally:
             sys.displayhook = old_displayhook
 
-
 class KCodeExecuter(object):
     """
-        Only Code Execution
+        Singleton Code Executor 
     """
 
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            print("Creating Singleton KCodeExecuter instance...")
+            cls._instance = super(KCodeExecuter, cls).__new__(cls)
+
+        return cls._instance
+
     def __init__(self):
-        self.tls = kTools.KTools()
-        #self.console = code.InteractiveConsole(locals())
-        self.console = CapturingConsole(locals())
+        if not hasattr(self, '_initialized'):
+            self.tls = KTools()
+            #self.console = code.InteractiveConsole(locals())
+            self.console = CapturingConsole(locals())
+            self._initialized = True
 
     def getLocals(self):
         return self.console.locals
