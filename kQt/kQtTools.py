@@ -3,7 +3,7 @@ Created on 17-Jan-2025
 
 @author: kayma
 '''
-__updated__ = "2025-09-08"
+__updated__ = "2025-10-14"
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import (QAction, QVBoxLayout)
@@ -47,7 +47,7 @@ class KQTTools():
         winObj.exec_()
         return outputDict
     
-    def createUiDialog(self, uiFileName, parent=None, title="KQt", isModel=True):
+    def createUiDialog(self, uiFileName, parent=None, title="KQt", isModel=False):
         '''
             Creates a UI Dialog window with given UI file. and returns the dialogWin and uiObjCollection.
             Use "showUiDialog" fn for displaying the dialog window . After you do all your UI modificaitons.
@@ -64,12 +64,13 @@ class KQTTools():
             self.tls.error(f"UI file [{uiFileName}] doesn't exist.")
         return winObj, uiObject
     
-    def showUiDialog(self, winObj, isModel=True):
+    def showUiDialog(self, winObj, isModel=False):
         '''
             Show the ui winobj. Mostly used with "createUiDialog" fn
         '''
         try:
             if isModel:            
+                print("model")
                 winObj.exec_()
             else:
                 winObj.show()
@@ -373,8 +374,9 @@ class KQTTools():
                 self.uiRefresh()    
                 
     def listAdder(self, listWidgetObj, text):
-        itm = QtWidgets.QListWidgetItem(text.strip())
-        listWidgetObj.addItem(itm)         
+        if text:
+            itm = QtWidgets.QListWidgetItem(str(text).strip())
+            listWidgetObj.addItem(itm)         
                 
     def connectToRightClick(self, Widget, FunctionToInvoke):
         self.enableRightClick(Widget)

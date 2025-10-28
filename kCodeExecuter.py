@@ -4,10 +4,10 @@ Created on 21-Mar-2025
 @author: kayma
 '''
 __created__ = "24-Apr-2025"
-__updated__ = "2025-07-15"
+__updated__ = "2025-10-15"
 __author__ = "kayma"
 
-import os, sys, time, json, importlib, code, inspect, types, atexit, traceback
+import os, sys, time, json, site, importlib, code, inspect, types, atexit, threading, traceback
 from time import strftime
 from kTools import KTools
 
@@ -51,22 +51,13 @@ class KCodeExecuter(object):
             #self.console = code.InteractiveConsole(locals())
             self.console = CapturingConsole(locals())
             self._initialized = True
+            self.runningThreads = []
 
     def getLocals(self):
         return self.console.locals
 
     def updateLocals(self, name, value):
         self.console.locals[name] = value
-
-    # def getUpdatedLocals(self):
-    #     try:
-    #         raise None
-    #     except:
-    #         frame = sys.exc_info()[2].tb_frame.f_back
-    #     namespace = frame.f_globals.copy()
-    #     namespace.update(frame.f_locals)
-    #     namespace['__name__'] = '__main__'
-    #     return namespace
 
     def runCommand(self, codeStr):
         self.tls.info(f'>> {codeStr}')
@@ -102,28 +93,32 @@ class KCodeExecuter(object):
             basePath = os.path.dirname(scriptFile)
             fName = os.path.basename(scriptFile)
             data = self.tls.getFileContent(scriptFile)
-            self.addToSysPath(basePath)
+            self.tls.sysPathAdder(basePath)
             self.runCode(data,fName)
         else:
             self.tls.error('Script file missing...' + str(scriptFile))
 
-    def cleanAndUpdateSysPaths(self, newPaths=[]):
-        #Clean Existing Path
-        existingPaths = []
-        for eachSysPath in sys.path:
-            pth = os.path.abspath(eachSysPath)
-            if not pth in existingPaths:
-                existingPaths.append(pth)
-        sys.path = existingPaths
-        for each in newPaths:
-            self.addToSysPath(each)
+    def runScriptThreaded(self, scriptFile=None):
+        """
+        Few scripts need to run seperatly in a thread - like flask server . or any server. 
+        Those kind of USER SCRIPTS can be exeucted in seperate thread. 
+        Remember: IMPORTANT!!!! seperate thread execution this function . runs indepdent and it should not make use of any UI OR PYQT elements in main.
+        all should be its own. no ui items from main cna be shared to the threaded app. NO UI APPS from USERS should run here. 
+        """
+        self.tls.debug('Trying to execute script file in seperate thread... %s' % scriptFile)
+        if scriptFile and os.path.exists(scriptFile):
+            basePath = os.path.dirname(scriptFile)
+            fName = os.path.basename(scriptFile)
+            data = self.tls.getFileContent(scriptFile)
+            self.tls.sysPathAdder(basePath)
+            t = threading.Thread(target=self.runCode, args=(data, fName))
+            t.start()
+            self.runningThreads.append(t)
+        else:
+            self.tls.error('Script file missing...' + str(scriptFile))
 
-    def addToSysPath(self, path):
-        path = os.path.abspath(path)
-        if('\.' in path): return None
-        if path not in sys.path and os.path.exists(path):
-            self.tls.info("Adding path to system... " + str(path))
-            sys.path.append(path)
+    def cleanAndUpdateSysPaths(self, customPaths=[]):
+        self.tls.sysPathUpdater(customPaths)
 
     def loadModule(self, modName, modFilePath):
         """Dynamically loads a Python module from an absolute file path.

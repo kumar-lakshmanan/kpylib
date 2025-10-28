@@ -87,7 +87,7 @@ tmp = tls.getSafeConfig(<list>, defaultValue)
 
 '''
 __created__ = "24-Apr-2025"
-__updated__ = "2025-08-07"
+__updated__ = "2025-10-14"
 __author__ = "kayma"
 
 import os, sys
@@ -114,6 +114,7 @@ import uuid
 import types
 import gc
 import ast
+import site
 
 try:
     from blinker import signal
@@ -236,7 +237,7 @@ class KTools(object):
 
             self.noLogPrintOnly = int(self.getSafeConfig(['logging','logProdMode'], 0)) if self.cfg else 0
 
-            self.addSysPaths()
+            self.sysPathUpdater()
 
             self._initialized = True
 
@@ -437,60 +438,83 @@ class KTools(object):
         else:
             if not clsName: clsName = modName
             return f'[{clsName}-{fnName}] {msg}'
+        
+    
+    def sysPathUpdater(self, customPaths=[]):
+        site.removeduppaths()
 
-    def addSysPaths(self, singlePath='', multiPaths=[]):
-
-        def pathToSysPath(inpPath):
-            if inpPath and not inpPath=="":
-                inpPath = Path(inpPath)
-                if os.path.exists(inpPath):
-                    inpPath = inpPath.resolve(strict=True)
-                    if inpPath.is_dir() and not str(inpPath) in os.environ:
-                        sys.path.append(str(inpPath))
-                else:
-                    self.warn(f"Add to syspath - invalid path {inpPath}")
-
-        #0. Basic System Paths:
-        pathToSysPath('.')
-        pathToSysPath(Path().cwd())
+        self.info(f"Refreshing syspaths...")
+        
+        #0. Basic Current Paths:
+        self.sysPathAdder('.')
+        self.sysPathAdder(Path().cwd())
         for eachPath in Path().cwd().parents:
-            pathToSysPath(eachPath)
+            self.sysPathAdder(eachPath)        
 
         #1. add env config sys paths if given:
+        envVariable = 'PYTHONPATH'
+        if envVariable in os.environ:
+            for eachPath in os.environ[envVariable].split(';'):
+                self.sysPathAdder(eachPath)
+
+        #2. add env config sys paths if given:
         envVariable = 'K_PYLIB'
         if envVariable in os.environ:
             for eachPath in os.environ[envVariable].split(';'):
-                pathToSysPath(eachPath)
+                self.sysPathAdder(eachPath)   
 
-        #2. add config paths if given:
+        #3. add config paths if given:
         configSysPaths = self.getSafeConfig(['general','sysPaths'], [])
         for eachPath in configSysPaths:
-            pathToSysPath(eachPath)
+            self.sysPathAdder(eachPath)                   
 
-        #3. addSingleGivenPath
-        pathToSysPath(singlePath)
+        #4. user site packages paths:
+        userSitePackages = site.getusersitepackages()
+        userSitePackages = userSitePackages if type(userSitePackages) == type([]) else [userSitePackages]        
+        for each in userSitePackages:
+            self.sysPathAdder(each)
 
-        #4. addMulitpleGivenPath
-        for eachPath in multiPaths:
-            pathToSysPath(eachPath)
-
-        #Clean/Remove duplicates
+        #5. system site packages paths:
+        sysSitePackages = site.getsitepackages()
+        sysSitePackages = sysSitePackages if type(sysSitePackages) == type([]) else [sysSitePackages]
+        for each in sysSitePackages:
+            self.sysPathAdder(each)
+        
+        #6. given custom paths:                    
+        for each in customPaths:
+            self.sysPathAdder(each)
+                      
+        self.info(f"Syspath refreshed. Total: {len(eachPath)}")    
+        
+    def sysPathDuplicatesRemover(self):
+        # Clean/Remove duplicates if any
         oldSysPaths = sys.path
         newSysPaths = []
         for eachPath in oldSysPaths:
             eachPath = eachPath.strip()
+            eachPath = os.path.abspath(eachPath)
+            eachPath = os.path.normpath(eachPath)            
             eachPath = Path(eachPath)
             eachPath = eachPath.resolve(strict=False)
             eachPath = eachPath.absolute()
             eachPath = eachPath.as_posix()
             eachPath = str(eachPath)
-            if not eachPath in newSysPaths: newSysPaths.append(eachPath)
-
+            if not eachPath in newSysPaths and os.path.isdir(eachPath) and os.path.exists(eachPath): 
+                newSysPaths.append(eachPath)
         sys.path.clear()
-
         for eachPath in newSysPaths:
-            sys.path.append(eachPath)
+            sys.path.append(eachPath) 
 
+    def sysPathAdder(self, inpPath=''):
+        if inpPath and not inpPath=="":
+            inpPath = os.path.abspath(inpPath)
+            inpPath = os.path.normcase(inpPath)
+            inpPath = Path(inpPath)
+            if inpPath.is_dir() and os.path.exists(inpPath):
+                sys.path.append(str(inpPath))
+            else:
+                self.warn(f"Unable to update syspath with Invalid path {inpPath}")
+        self.sysPathDuplicatesRemover()
 
     #------------------------------------------------------------------------
 
