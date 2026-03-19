@@ -2,8 +2,8 @@
 	"general" : {
 					"timeStampFormat" : "%Y%m%d%H%M%S",
 					"dateTimeFormat" : "%Y-%m-%d %I:%M:%S %p",
-					"uselivedata" : 0,
-					"hostname": "MUKUND_PC"
+					"hostname": "MUKUND_PC",
+					"test" : "some value from config"
 				},
 	"logging" : {
 					"logDisable" : 0,
