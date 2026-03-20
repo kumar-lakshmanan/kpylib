@@ -1,6 +1,6 @@
 # kTools – Generic Tool Collection
 
-> The `kTools` library is a **singleton** utility collection that powers many of the scripts in this project. It is designed to be lightweight, easy to drop into any Python application, and comes with a full set of helpers for configuration, logging, file handling, system integration, and simple encryption. Testing
+> The `kTools` library is a **singleton** utility collection that powers many of the scripts in this project. It is designed to be lightweight, easy to drop into any Python application, and comes with a full set of helpers for configuration, logging, file handling, system integration, and simple encryption.
 
 ---
 
