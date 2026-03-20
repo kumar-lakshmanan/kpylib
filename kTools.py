@@ -1,0 +1,1473 @@
+'''
+## ktools
+@author: Kumaresan
+
+Configurable Generic tool collection
+
+# Initial Setup:
+--------------------
+To integerate in any app, It needs four main thing needed at start-up....
+
+-kpylib:
+    custom lib folder (this folder) which has all lib needed for this app to work.
+    kpylib  (G:\pyworkspace\kpylib) should be in sys.path. and should import kTools module.
+    atleast this path should be in environment variable - K_PYLIB. else default value given at the beginning will be added to env & sys.path.
+    Also. In your development env IDE, use this folder as reference for development time reference links.
+
+-kTools:
+    (this file) module with lot of simple tools for app supporting
+
+-lookup:
+    module - contains default values for the app to work, developers can customize it like string Hardcodings, defaults etc. not for end users.
+
+-config json:
+    contains default values for the app to work, where users can change as per their need to customize the tool.
+    
+    
+#-------ADD THIS HEADER CODE TO YOUR MAIN------
+import os, sys
+K_PYLIB = '../kpylib'
+K_CONFIG = os.path.abspath('config.json')
+if not ('K_PYLIB' in os.environ and os.path.exists(os.environ['K_PYLIB'])): os.environ['K_PYLIB'] = K_PYLIB
+if not ('K_PYLIB' in os.environ and os.path.exists(os.environ['K_PYLIB'])): sys.exit("K_PYLIB not found!")
+for eachDependency in os.environ['K_PYLIB'].split(';'): sys.path.append(eachDependency.strip())
+if not ('K_CONFIG' in os.environ and os.path.exists(os.environ['K_CONFIG'])): os.environ['K_CONFIG'] = K_CONFIG
+if not ('K_CONFIG' in os.environ and os.path.exists(os.environ['K_CONFIG'])): sys.exit("K_CONFIG not found!")
+#----------------------------------------------
+
+# ------BASIC setup example-----------
+import kTools   
+import lookup    
+CONFIG_JSON = "./somelocation/config.json"  
+
+class MyAIChatBot():
+
+    def __init__(self):
+        self.tls = kTools.KTools("MyAIChatBot", lookup, CONFIG_JSON)
+        self.tls.helloworld()
+
+-----------------------------
+Sub sequent modules, tools creation:
+-----------------------------
+tls = ktools.KTools()
+
+
+For quick checks:
+-----------------------------
+import kTools; tls = kTools.KTools()
+
+# ------BASIC setup example-----------
+
+
+# Configuration 1:
+--------------------
+Env variables and descriptions
+
+K_PYLIB            -   \kpylib                Folder location of this file.
+K_CONFIG           -   config.json            JSON Config file.
+K_ISPROD           -   1/0                    1 For actual prod, 0 or Missing For non prod.
+COMPUTERNAME       -   SYSTEM WILL SET        Additionally, IN CONFIG, GIVE YOUR developr SYSTEM NAME. So it finds the dev mode or prod mode.
+
+# Configuration 2:
+--------------------
+App basic infos, Strings and Hardcodings and many more configurations are placed in one lookup python file.
+And that module can be given to the tool class to customize it. Sample default lookup module available in this folder.
+If not found, tool class will auto generate one with basics.
+
+# Usage:
+--------------------
+After all initial setup and configurations.
+
+In your all module codes. create the tool instance. it will be singleton object.
+only once it creates and initalize. and all will share the same object.
+
+
+# Some key features usage:
+------------------------
+
+# General feature access:
+tls.helloworld()
+tls.getRandom(10)
+tls.turnOnProdSim(1)
+tls.turnOnDebug(1)
+
+# Accessing Lookup properties
+tmp = tls.lookup.__appname__
+tmp = tls.lookUp.<prop>
+
+# Accesing the config properties
+tmp = tls.cfg["gen"]["prop"]
+tmp = tls.getSafeConfig(<list>, defaultValue)
+
+
+'''
+__created__ = "24-Apr-2025"
+__updated__ = "2026-03-19"
+__author__ = "kayma"
+
+import os, sys
+
+from pathlib import Path
+from datetime import timedelta
+from time import strftime
+import logging
+import logging.config
+import json
+import zipfile
+import subprocess
+import traceback
+import datetime
+import getpass
+import inspect
+import socket
+import pprint
+import pickle
+import random
+import shutil
+import atexit
+import uuid
+import types
+import gc
+import ast
+import site
+
+# Fix for Unicode encoding issues on Windows
+if sys.platform == "win32":
+    # Set the console code page to UTF-8
+    os.system("chcp 65001 > nul")
+
+# Ensure stdout and stderr use UTF-8 encoding
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
+# Set environment variable for Python IO encoding
+os.environ["PYTHONIOENCODING"] = "utf-8"
+
+GLOBAL_APPNAME_HOLDER = "KAppNameHolder"
+DEFAULT_APP_NAME = "KMXDefApp"
+
+def handleUnhandledExceptionExit(expType, expVal, traceBack):
+    """
+    To capture last error happend, invoked by sys exception hook
+    sys.excepthook = handleUnhandledExceptionExit
+    """
+    print("Exiting with unhandled exception")
+    tls = KTools()
+    if tls:
+        tls.doSystemErrorHandle(expType, expVal, traceBack)
+    else:
+        lastErrorInfo = traceback.format_exc()
+        lastErrorInfo = lastErrorInfo.strip()
+        if lastErrorInfo == "NoneType: None" or lastErrorInfo == "None":
+            lastError = traceback.format_exception(expType, expVal, traceBack)
+            lastErrorInfo = ""
+            for eachLine in lastError:
+                lastErrorInfo += eachLine
+        errorContent = f"\nError happend on {strftime('%Y-%m-%d %I:%M:%S %p')}\n{lastErrorInfo}"
+        try:
+            print(f'--------\n{errorContent}--------')
+            if os.path.exists('logs'):
+                fileName = f"logs/error_{strftime('%Y%m%d')}.log"
+            else:
+                fileName = f"error_{strftime('%Y%m%d')}.log"             
+            f = open(fileName, "a")
+            f.write(errorContent)
+            f.close()
+            sys.exit()
+        except IOError:
+            pass
+
+def handleAppExit():
+    '''
+    Invoke on all exit or shutdown or close of instance. and perform exit clean up function.
+    Check doExitCleanUp
+    '''
+    print("App exiting with doExitCleanUp process. Thank you.")
+    tls = KTools()
+    if tls:
+        tls.doExitCleanUp()
+    else:
+        print('App shutdown initiated, Unable to do ktool based cleanup explicitly.')
+        print('Hope, App handled exit cleanup activity internally.')
+        print('Anyway, Thank you for using the app.')
+
+class CustomLogHandler(logging.Handler):
+
+    def __init__(self, logPrinterFn=None):
+        super().__init__()
+        self.callBackLogPrinterFn = logPrinterFn
+
+    def emit(self, record):
+        msg = self.format(record)
+        if self.callBackLogPrinterFn:
+            self.callBackLogPrinterFn(msg)
+
+class KTools(object):
+
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            print("Starting... " + str(sys.argv))
+            print("Location... " + str(os.path.abspath(os.curdir)))
+            print("Creating Singleton KTools instance...")
+            cls._instance = super(KTools, cls).__new__(cls)
+
+            #Attach unhandled exception handling and exit handling
+            sys.excepthook = handleUnhandledExceptionExit
+            atexit.register(handleAppExit)
+
+        return cls._instance
+
+    def __init__(self, appName=None, customPyLookUp=None, customJsonConfigFile=None):
+        if not hasattr(self, '_initialized'):
+
+            self.cfgFile = None
+            self.cfg = None
+            self.qapp = None
+            self.appName = None
+            self.noLogPrintOnly = 1
+            self.share = {}
+
+            self.lookUp = self.setUpLookUp(customPyLookUp)      #USAGE: self.lookUp.<prop>
+            self.cfg = self.setUpConfig(customJsonConfigFile)   #USAGE: self.getSafeConfig(<list>,defaultValue)
+            self.appName = self.getAppName(appName)
+
+            globals()[GLOBAL_APPNAME_HOLDER] = self.appName
+
+            self.exitCallBackFn = None
+            self.entryCallBackFn = None
+            self.logCustomLogPrintFn = None
+            self.logFormatter = None
+            self.passwordMasking = 1
+            self.passwordLists = []
+            self.allPubSubSignals = {}
+            self.logSkipFor = []
+            self._simulateProd = 0
+
+            self.logSys = self.setUpLogger()
+
+            self.randomSeed = self.lookUp.randomSeed + int(self.getDateTime('%I%M%S'))
+            self.rand = random.Random(self.randomSeed)
+
+            self.noLogPrintOnly = int(self.getSafeConfig(['logging','logProdMode'], 0)) if self.cfg else 0
+
+            self.sysPathUpdater()
+
+            self._initialized = True
+
+    #------------------------------------------------------------------------            
+
+    def helloworld(self):
+        self.info("Hello world from KTools")
+
+    def getAppName(self, appName=None):
+        #print("Determining app name... ", end=" ")
+        if hasattr(self, 'appName') and self.appName:
+            appName = self.appName
+            #print("From memory: " + appName)
+        elif GLOBAL_APPNAME_HOLDER in globals():
+            appName = globals()[GLOBAL_APPNAME_HOLDER]
+            #print("From global: " + appName)
+        elif appName:
+            appName = appName.strip()
+            #print("From given: " + appName)
+        elif hasattr(self.lookUp, '__app__') and self.lookUp.__app__:
+            appName = self.lookUp.__app__
+            #print("From lookup: " + appName)
+        elif len(sys.argv):
+            appName = os.path.basename(sys.argv[0])
+            appName = appName.strip().lower().replace('.py', '').replace(' ', '').upper()
+            #print("From running file: " + appName)
+        else:
+            appName = DEFAULT_APP_NAME.strip()
+            #print("From default: " + appName)
+
+        #appName Rules
+        r1 = 5 <= len(appName) <= 25
+        r2 = appName.find(' ') == -1
+        if not( r1 and r2 ): self.raiseError(f"AppName:[{appName}] is not valid.")
+        return appName
+    
+    def getValue(self, key:str, default:str=None) -> str:
+        """
+        Fetch value for the given key. Try to find value in below areas in given order.
+        
+        1. Argument value 
+        2. Env Variable
+        3. Config File - General Category
+        4. Lookup File
+        5. Default value in argument
+        
+        """
+        
+        if key:
+            
+            if self.isArgPresent(key):
+                return self.getArgValue(key)
+            
+            if key in os.environ:
+                return os.environ[key]
+            
+            if self.getSafeConfig(['general',key]):
+                return self.getSafeConfig(['general',key])
+
+            if hasattr(self.lookUp, key) and getattr(self.lookUp, key):
+                return getattr(self.lookUp, key)
+    
+        self.debug(f"Value for {key} not found. using default {default}")
+        return default
+        
+    def getConfigFile(self, customJsonConfigFile=None):
+        """
+            Returns config file to be used.
+
+            Order:
+                1. Parameter / Argument
+                2. Env Variable with LookUp Name
+                3. Default LookUp File Or Overriden LookUp
+                3. Relative File
+        """
+        nowFile = customJsonConfigFile
+        if nowFile and os.path.exists(nowFile) and os.path.isfile(nowFile):
+            return os.path.abspath(nowFile)
+
+        nowEnvFile = self.lookUp.envVarJsonConfigFile
+        nowFile = self.getSafeEnv(nowEnvFile, None)
+        if nowFile and os.path.exists(nowFile) and os.path.isfile(nowFile):
+            return os.path.abspath(nowFile)
+
+        nowFile = self.lookUp.JsonConfigFile
+        if nowFile and os.path.exists(nowFile) and os.path.isfile(nowFile):
+            return os.path.abspath(nowFile)
+
+        nowFile = "config.json"
+        if nowFile and os.path.exists(nowFile) and os.path.isfile(nowFile):
+            return os.path.abspath(nowFile)
+
+        nowFile = None
+
+    def getSafeConfig(self, lst, default=None):
+        current = self.cfg
+        for key in lst:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                return default
+        return current
+
+    def setUpLookUp(self, customPyLookUp=None):
+        """
+            This is to override the default lookup and use custom lookup.
+            Each Projects can have thier own lookups.
+            Copy the ktoolsDefaultLookUps.py to your app , rename
+            and use it as customLookUp for your project.
+            MAKE SURE YOU DONT REMOVE EXISITNG LOOKUPS.
+            JUST ADD YOU LOOKUPS. OR MODIFY VALUE OF EXISTING LOOKUPS.
+        """
+
+        def createDynamicLookup():
+            print("Creating dynamic lookup...")
+            mod = types.ModuleType("K_DYNAMIC_LOOKUP")
+            # Set attributes
+            mod.__app__ = 'KDynApp'
+            mod.__appName__ = 'KMX Dynamic Default App'
+            mod.__desc__ = 'KMX Dynamic Default App - Dynamic Default template for any apps'
+            mod.__creater__ = 'Kumaresan Lakshmanan'
+            mod.__date__ = '1983-09-26'
+            mod.__version__ = '0.0.1'
+            mod.__updated__ = '1983-09-26'
+            mod.__release__ = 'Test'
+
+            mod.versionStr = "v%s" % mod.__version__
+            mod.versionInfo = '%s (%s)' % (mod.versionStr, mod.__updated__)
+            mod.contactInfo = 'Contact kaymatrix@gmail.com for more info.'
+
+            # Env Variables
+            mod.envVarJsonConfigFile = 'K_CONFIG'  # Config File location
+            mod.envVarIsProd = 'K_ISPROD'  # Is it Prod
+
+            # More Config
+            mod.lookUpType = 'dynamic'
+            mod.JsonConfigFile = 'config.json'
+            mod.ciperKey = 1001
+            mod.randomSeed = 25
+            
+            mod.test="abc srt from lookup"
+
+            return mod
+
+        print("Loading lookup...",end=" ")
+        if customPyLookUp:
+            if customPyLookUp: print("Custom:"+str(customPyLookUp))
+            return customPyLookUp
+        else:
+            try:
+                import kToolsDefaultLookUps
+                if kToolsDefaultLookUps: print("Default:" + str(kToolsDefaultLookUps))
+                return kToolsDefaultLookUps
+            except ImportError:
+                try:
+                    mod = createDynamicLookup()
+                    if mod: print("Dynamic:" + str(mod))
+                    return mod
+                except Exception as err:
+                    print("Unable to load")
+                    print(err)
+                    raise Exception("Unable to load lookup")
+
+    def setUpConfig(self, jsonConfigFile=None):
+        """
+        Read config file and load for internal reference
+        """
+
+        self.cfgFile = self.getConfigFile(jsonConfigFile)
+        if not self.cfgFile or not self.isFileExists(self.cfgFile):
+            print(f"CFG file is must. File [{self.cfgFile}] is missing.\nAtleast, set the env variable {self.lookUp.envVarJsonConfigFile} with config.json")
+            sys.exit(0)
+        else:
+            print(f"Loading config...", end=" ")
+            with open(self.cfgFile) as fobj: self.cfg = json.load(fobj)
+            print(f"{self.cfgFile} loaded.")
+            return self.cfg
+
+    def setUpLogger(self):
+        """
+        Logging for your modules.
+        Create ttls and start logging like given below
+        """
+        if hasattr(self, 'logSys') and self.logSys: return self.logSys
+
+        currentConfig = {}
+        currentConfig['version'] = 1
+        currentConfig['disable_existing_loggers'] = 0
+        logging.config.dictConfig(currentConfig)
+
+        for eachHandler in logging.root.handlers:
+            logging.root.removeHandler(eachHandler)
+
+        self.logFormatter  = logging.Formatter(fmt=self.cfg["logging"]["logFormat"], datefmt=self.cfg["logging"]["logDateTimeFormat"])
+        self.logSys = logging.getLogger(self.appName)
+        self.logSys.setLevel(self.cfg["logging"]["logLevel"])
+        self.logSys.disabled = self.cfg["logging"]["logDisable"]
+
+        if self.cfg["logging"]["logToConsole"]:
+            streamHandler = logging.StreamHandler()
+            streamHandler.set_name(f"StreamHandler_{self.appName}")
+            streamHandler.setFormatter(self.logFormatter)
+            if hasattr(streamHandler.stream, 'encoding'):
+                streamHandler.stream.reconfigure(encoding='utf-8')
+            self.logSys.addHandler(streamHandler)
+
+        if self.cfg["logging"]["logToFile"]:
+            fileHandler = logging.FileHandler(self.cfg["logging"]["logFile"])
+            fileHandler.set_name(f"FileHandler_{self.appName}")
+            fileHandler.setFormatter(self.logFormatter)
+            if hasattr(fileHandler.stream, 'encoding'):
+                fileHandler.stream.reconfigure(encoding='utf-8')
+            self.logSys.addHandler(fileHandler)
+
+        return self.logSys
+
+
+    def addCustomLogPrinter(self, logCustomLogPrintFn):
+        if logCustomLogPrintFn:
+            self.logCustomLogPrintFn = logCustomLogPrintFn
+            customHandler = CustomLogHandler(self.logCustomLogPrintFn)
+            customHandler.set_name(f"CustomHandler_{self.appName}")
+            customHandler.setFormatter(self.logFormatter)
+            self.logSys.addHandler(customHandler)
+
+    def _logFormatter(self, msg, skipLevel=2):
+        fnName, clsName, modName, modFile = self.getCallerInfo(skipLevel)
+        if self.cfg and self.cfg["logging"]["logModuleName"]:
+            if not clsName:
+                return f'[{modName}-{fnName}] {msg}'
+            else:
+                return f'[{modName}-{clsName}-{fnName}] {msg}'
+        else:
+            if not clsName: clsName = modName
+            return f'[{clsName}-{fnName}] {msg}'
+        
+    
+    def sysPathUpdater(self, customPaths=[]):
+        site.removeduppaths()
+
+        self.info(f"Refreshing syspaths...")
+        
+        #0. Basic Current Paths:
+        self.sysPathAdder('.')
+        self.sysPathAdder(Path().cwd())
+        for eachPath in Path().cwd().parents:
+            self.sysPathAdder(eachPath)        
+
+        #1. add env config sys paths if given:
+        envVariable = 'PYTHONPATH'
+        if envVariable in os.environ:
+            for eachPath in os.environ[envVariable].split(';'):
+                self.sysPathAdder(eachPath)
+
+        #2. add env config sys paths if given:
+        envVariable = 'K_PYLIB'
+        if envVariable in os.environ:
+            for eachPath in os.environ[envVariable].split(';'):
+                self.sysPathAdder(eachPath)   
+
+        #3. add config paths if given:
+        configSysPaths = self.getSafeConfig(['general','sysPaths'], [])
+        for eachPath in configSysPaths:
+            self.sysPathAdder(eachPath)                   
+
+        #4. user site packages paths:
+        userSitePackages = site.getusersitepackages()
+        userSitePackages = userSitePackages if type(userSitePackages) == type([]) else [userSitePackages]        
+        for each in userSitePackages:
+            self.sysPathAdder(each)
+
+        #5. system site packages paths:
+        sysSitePackages = site.getsitepackages()
+        sysSitePackages = sysSitePackages if type(sysSitePackages) == type([]) else [sysSitePackages]
+        for each in sysSitePackages:
+            self.sysPathAdder(each)
+        
+        #6. given custom paths:                    
+        for each in customPaths:
+            self.sysPathAdder(each)
+                      
+        self.info(f"Syspath refreshed. Total: {len(eachPath)}")    
+        
+    def sysPathDuplicatesRemover(self):
+        # Clean/Remove duplicates if any
+        oldSysPaths = sys.path
+        newSysPaths = []
+        for eachPath in oldSysPaths:
+            eachPath = eachPath.strip()
+            eachPath = os.path.abspath(eachPath)
+            eachPath = os.path.normpath(eachPath)            
+            eachPath = Path(eachPath)
+            eachPath = eachPath.resolve(strict=False)
+            eachPath = eachPath.absolute()
+            eachPath = eachPath.as_posix()
+            eachPath = str(eachPath)
+            if not eachPath in newSysPaths and os.path.isdir(eachPath) and os.path.exists(eachPath): 
+                newSysPaths.append(eachPath)
+        sys.path.clear()
+        for eachPath in newSysPaths:
+            sys.path.append(eachPath) 
+
+    def sysPathAdder(self, inpPath=''):
+        if inpPath and not inpPath=="":
+            inpPath = os.path.abspath(inpPath)
+            inpPath = os.path.normcase(inpPath)
+            inpPath = Path(inpPath)
+            if inpPath.is_dir() and os.path.exists(inpPath):
+                sys.path.append(str(inpPath))
+            else:
+                self.warn(f"Unable to update syspath with Invalid path {inpPath}")
+        self.sysPathDuplicatesRemover()
+
+    #------------------------------------------------------------------------
+
+    def getArgs(self):
+        if len(sys.argv) > 1:
+            return sys.argv[1:]
+        return []
+
+    def isArgPresent(self, checkFor):
+        for each in self.getArgs():
+            if each.lower().startswith(checkFor.lower()):
+                return True
+        return False
+
+    def getArgValue(self, argName):
+        #['arg="Sdf sd"','fe=xcvx', 'dv=er' ]
+        # getArgVALUE('fe') -> xcvx
+        if self.isArgPresent(argName):
+            for each in self.getArgs():
+                if each.lower().startswith(argName.lower()):
+                    data = each.split('=')
+                    if len(data) == 2:
+                        return data[1]
+        return ''
+
+    def alignedParams(self, key, value, justify=25, justfyChar='.'):
+        "Display good KEY..........VALUE"
+        return str(key).strip().ljust(justify, justfyChar) + str(value).strip()
+
+    def passwordCleanInfo(self, msg):
+        if self.passwordMasking:
+            for each in self.passwordLists:
+                if each in msg:
+                    mask = 'X' * len(each)
+                    msg = msg.replace(each, mask)
+        return msg
+
+    def prittyPrint(self, data=''):
+        pp = pprint.PrettyPrinter(indent=4)
+        pp.pprint(data)
+
+    def printObjInfos(self, obj):
+        lst = self.getObjInfos(obj)
+        for each in lst:
+            info = f'{each[0]} - {each[1]}'
+            self.debug(info)
+            print(info)
+
+    def _logSkipFilter(self, msg):
+        for eachWord in self.logSkipFor:
+            if str(eachWord) in str(msg):
+                return True
+        return False
+
+    #------------------------------------------------------------------------    
+
+    def info(self, msg, skipLevel=2):
+        msg = self._logFormatter(msg, skipLevel)
+        if not self._logSkipFilter(msg):
+            msg = self.passwordCleanInfo(msg)
+            print(msg) if self.noLogPrintOnly else self.logSys.info(msg)
+
+    def debug(self, msg, skipLevel=2):
+        msg = self._logFormatter(msg, skipLevel)
+        if not self._logSkipFilter(msg):
+            msg = self.passwordCleanInfo(msg)
+            print(msg) if self.noLogPrintOnly else self.logSys.debug(msg)
+
+    def warn(self, msg, skipLevel=2):
+        msg = self._logFormatter(msg, skipLevel)
+        if not self._logSkipFilter(msg):
+            msg = self.passwordCleanInfo(msg)
+            print(msg) if self.noLogPrintOnly else self.logSys.warning(msg)
+
+    def error(self, msg, skipLevel=2):
+        msg = self._logFormatter(msg, skipLevel)
+        if self.noLogPrintOnly:
+            print(msg)
+        else:
+            self.logSys.error(msg) if hasattr(self, 'logSys') and self.logSys else print(msg)           
+
+    def errorAndExit(self, msg, skipLevel=2):
+        msg = self._logFormatter(msg, skipLevel)
+        if self.noLogPrintOnly:
+            print(msg)
+        else:
+            self.logSys.error(msg) if hasattr(self, 'logSys') and self.logSys else print(msg)
+        sys.exit(-1)
+        
+    #------------------------------------------------------------------------        
+
+    def getCallerInfo(self, skipLevel=1):
+        fnName, clsName, modName, modFile = "", "", "", ""
+        try:
+            stack = inspect.stack()
+            stack = stack[skipLevel + 1:]
+            if len(stack) > 0:
+                entry = stack[0]
+                if len(entry) > 3:
+                    fcode = entry[0]
+                    fnName = str(entry[3])
+                    clsName = ''
+                    modName = ''
+                    modFile = str(entry[1])
+                    if hasattr(fcode, 'f_locals'):
+                        lcls = fcode.f_locals
+                        if 'self' in lcls:
+                            selfObj = lcls['self']
+                            if selfObj:
+                                clsName = str(selfObj.__class__.__name__)
+                                modName = str(selfObj.__module__)
+                        else:
+                            modName = os.path.basename(modFile)
+                            modName = os.path.splitext(modName)[0]
+                    else:
+                        modName = os.path.basename(modFile)
+                        modName = os.path.splitext(modName)[0]
+        except:
+            return fnName, clsName, modName, modFile
+        return fnName, clsName, modName, modFile
+
+    def getLastErrorInfo(self, expType=None, expVal=None, traceBack=None, skipLevel=1):
+        if traceBack!=None:
+            lastErrorData = traceback.format_tb(traceBack)
+        elif expVal!=None and traceBack==None:
+            lastErrorData = expVal.__str__()
+        else:
+            lastErrorData = traceback.format_exc()
+
+        if 'NoneType: None' in lastErrorData:
+            errorContent = f"No error found recently."
+        else:
+            errorContent = f"Error happend on {strftime('%Y-%m-%d %I:%M:%S %p')}\n{lastErrorData}"
+        return errorContent
+
+    def getTraceInfo(self, skipLevel=1):
+        stack = inspect.stack()
+        stack = stack[skipLevel + 1:]
+        stack = reversed(stack)
+        traceInfo = ''
+        head = '\nTraceback (code reference)\n'
+        for each in stack:
+            mod = each[1]
+            lineNo = str(each[2])
+            fn = each[3]
+            line = str(each[4][0]).strip() if each[4] else ''
+            traceInfo += f'\n File "{mod}", line {lineNo}, in {fn}'
+            traceInfo += f'\n {line}'
+            traceInfo += f'\n'
+        traceInfo = head + traceInfo.strip()
+        return traceInfo
+
+    #------------------------------------------------------------------------
+    
+    def doCleanMemory(self):
+        gc.collect()
+
+    def doSystemErrorHandle(self, expType, expVal, traceBack):
+        '''This mainly writes last error to file'''
+        lastErrorInfo = self.getLastErrorInfo(expType, expVal, traceBack)
+        if not 'No error' in lastErrorInfo:
+            lastError = traceback.format_exception(expType, expVal, traceBack)
+            lastErrorInfo = ""
+            for eachLine in lastError:
+                lastErrorInfo += eachLine
+            errorContent = f"\nError happend on {strftime('%Y-%m-%d %I:%M:%S %p')}\n{lastErrorInfo}"
+        else:
+            errorContent = f"\nNo system error on {strftime('%Y-%m-%d %I:%M:%S %p')}"
+        self.error(errorContent, 4) if hasattr(self, 'logSys') else print(errorContent)
+        if os.path.exists('logs'):
+            fileName = f"logs/error_{strftime('%Y%m%d')}.log"
+        else:
+            fileName = f"error_{strftime('%Y%m%d')}.log"            
+        print("verify error log file:", fileName)
+        self.writeFileContent(fileName, errorContent, 'a')
+
+    def doEntryStartUp(self):
+        self.info(f"Starting app {self.appName} startup activity....")
+        if hasattr(self, 'entryCallBackFn') and self.entryCallBackFn: self.entryCallBackFn()
+        self.info(f"App {self.appName} initialized.")
+
+    def doExitCleanUp(self):
+        self.info(f"Starting app {self.appName} shutdown cleanup activity....")
+        if hasattr(self, 'exitCallBackFn') and self.exitCallBackFn: self.exitCallBackFn()
+        self.info(f"Thank you for using the app {self.appName}.")
+
+    #------------------------------------------------------------------------
+
+    def shellExecuteWait(self, command):
+        subprocess.call(command)
+
+    def shellExecuteNoBlock(self, command):
+        subprocess.Popen(command)
+
+    def shellExecuteWithIO(self, cmdLine, wd, inputs=[], futureArgs={}):
+
+        showWindow = self.getSafeDictValue(futureArgs, 'showWindow', False)
+        cmdList = cmdLine.split(' ')
+
+        # Hide console window if needed (Windows-specific)
+        startupinfo = None
+        if os.name == 'nt' and not showWindow:
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+        # Start the subprocess
+        proc = subprocess.Popen(
+            cmdList,
+            cwd=os.path.abspath(wd),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True,
+            startupinfo=startupinfo
+        )
+
+        output_lines = []
+        isInputAvailable = len(inputs)
+        input_iter = iter(inputs)
+
+        try:
+            for line in proc.stdout:
+                output_lines.append(line.rstrip())
+                if isInputAvailable:
+                    try:
+                        # Feed next input line, if available
+                        next_input = next(input_iter)
+                        proc.stdin.write(next_input + '\n')
+                        proc.stdin.flush()
+                    except StopIteration:
+                        pass
+
+            proc.wait()
+        except Exception as e:
+            proc.kill()
+            raise e
+
+        return output_lines
+
+    #------------------------------------------------------------------------
+
+    def fileLauncherWithBin(self, bin, fileToOpen):
+        cmd = f'"{bin}" "{fileToOpen}"'
+        self.shellExecuteNoBlock(cmd)
+
+    def encrypt(self, text, cryptoKey=None):
+        cryptoKey = cryptoKey if cryptoKey else self.lookUp.ciperKey
+        cipher = ''
+        for each in text:
+            c = (ord(each) + int(cryptoKey)) % 126
+            if c < 32: c += 31
+            cipher += chr(c)
+        return cipher
+
+    def decrypt(self, text, cryptoKey=None):
+        cryptoKey = cryptoKey if cryptoKey else self.lookUp.ciperKey
+        plaintext = ''
+        for each in text:
+            p = (ord(each) - int(cryptoKey)) % 126
+            if p < 32: p += 95
+            plaintext += chr(p)
+        return plaintext
+
+    def getRandom(self, stop, start=0):
+        return self.rand.randrange(start, stop)
+
+    def getSystemName(self):
+        return str(socket.gethostname())
+
+    def getCurrentPath(self):
+        return os.path.abspath(os.curdir)
+
+    def getCurrentUser(self):
+        return getpass.getuser()
+
+    def getRelativeFolder(self, folderName):
+        return os.path.join(self.getCurrentPath(), folderName)
+
+    def getDateCalc(self, addRemoveDays=0, format='%Y-%m-%d', fromDate=None):
+        fromDate = fromDate if fromDate else datetime.datetime.today()
+        res = fromDate + timedelta(days=addRemoveDays)
+        return res.strftime(format)
+
+    def getDateCalcObj(self, addRemoveDays=0, fromDate=None):
+        fromDate = fromDate if fromDate else datetime.datetime.today()
+        res = fromDate + timedelta(days=addRemoveDays)
+        return res
+
+    def getDateTimeObjFor(self, input, format='%Y-%m-%d'):
+        return datetime.datetime.strptime(str(input), format)
+
+    def getDateTimeForObj(self, dateTimeObj, format='%Y%m%d %H%M%S'):
+        return dateTimeObj.strftime(format)
+
+    def getDateBetweenTwoDate(self, startDate, endDate, format='%Y%m%d'):
+        sdate = self.getDateTimeObjFor(startDate, format)   # start date
+        edate =self.getDateTimeObjFor(endDate, format)   # end date
+        lst = [sdate+timedelta(days=x) for x in range((edate-sdate).days)]
+        nlst = []
+        for each in lst: nlst.append(self.getDateTimeForObj(each, format))
+        return nlst
+
+    def getSafeEnv(self, parameter, defaultValue=None):
+        envs = dict(os.environ)
+        return self.getSafeDictValue(envs, parameter, defaultValue)
+
+    def getSafeDictValue(self, inpDict, keyToLookUp, defaultValue=None):
+        finValue = defaultValue
+        if type(inpDict) == type({}):
+            if keyToLookUp in inpDict.keys():
+                return inpDict[keyToLookUp]
+        return finValue
+    
+    def getSafeObject(self, mainObj, attrib, default=None):
+        if hasattr(mainObj, attrib):
+            return mainObj.attrib
+        else:
+            return default
+
+    def getDictSpecifics(self, inputDict, *keys):
+        newDict = {}
+        for eachKey in keys:
+            newDict[eachKey] = self.getDictDefault(inputDict, eachKey, None)
+        return newDict
+
+    def getDictFormatted(self, inputDict):
+        return pprint.pprint(inputDict)
+
+    def addOnlyUniqueToDict(self, inThisDict, keyToAdd, valueToAdd, forceAddLatest=0):
+        if self.isNotPresentInDict(inThisDict, keyToAdd):
+            inThisDict[keyToAdd] = valueToAdd
+        else:
+            if forceAddLatest:
+                inThisDict[keyToAdd] = valueToAdd
+                self.error(f"{keyToAdd} is not unique. Updating same with new value!")
+            else:
+                self.error(f"{keyToAdd} is not unique. Not adding new!")
+
+    def isNotPresentInDict(self, inThisDict, checkForThis):
+        return not checkForThis in inThisDict.keys()
+
+    def isListedItemPresentInText(self, lookUpList = [], searchInText=""):
+        checkIsPresent = lambda lookUpList, searchInText: any(word in searchInText for word in lookUpList)
+        return checkIsPresent(lookUpList, searchInText)
+
+    # ----------------------------------------------------------------------------
+
+    def isWindows(self):
+        return os.name == 'nt'
+
+    def isLinux(self):
+        return os.name == 'posix'
+
+    def isLocal(self):
+        if self.isWindows():
+            return os.environ['COMPUTERNAME'] == self.getSafeConfig(['general','hostname'])
+        return False
+
+    def isProd(self):
+        return (self.smartBool(self.getSafeEnv('K_ISPROD', 0)) and not self.isLocal()) or self._simulateProd
+
+    def isItMorning(self):
+        return self.getDateTime('%p').lower() == 'am'
+
+
+    # ----------------------------------------------------------------------------
+
+
+    def turnOnDebugLogs(self, turnOn=1):
+        self.logSys.setLevel("DEBUG") if turnOn else self.logSys.setLevel("INFO")
+
+    def turnOnProdSim(self, turnOn=1):
+        self._simulateProd = turnOn
+
+    # ----------------------------------------------------------------------------
+
+    def convertStrToLiteralObject(self, inpString):
+        try:
+            return ast.literal_eval(inpString)
+        except Exception as e:
+            self.error(e)
+            return None
+
+    def convertDictStrToDict(self, strDict):
+        return json.loads(strDict)
+
+    def convertDictToDictStr(self, dictObj):
+        return json.dumps(dictObj)        
+
+    # ----------------------------------------------------------------------------
+    
+    def getSharedObj(self, objName, default=None):
+        return self.getSafeDictValue(self.share, objName, default)    
+
+    def setSharedObj(self, objName, objValue=None):
+        self.share[objName] = objValue
+
+    def getDateDiff(self, date1, date2, format='%Y-%m-%d'):
+        '''
+        ret 1 means date1 is 1 day old than date 2
+        ret 0 measn both are same
+        ret -1 means date1 is 1 day after date2
+        '''
+        d1 = self.getDateTimeObjFor(date1, format)
+        d2 = self.getDateTimeObjFor(date2, format)
+        res = d2 - d1
+        return res.days
+
+    def getDateTimeStamp(self, format="%Y%m%d%H%M%S"):
+        return self.getDateTime(format)
+
+    def getTimeStamp(self):
+        return self.getDateTime(self.cfg["general"]["timeStampFormat"])
+
+    def getTemp(self):
+        return self.cfg["folders"]["temp"]
+
+    def getUUID(self):
+        return str(uuid.getnode())
+
+    def getUUID4(self):
+        return str(uuid.uuid4())
+
+    def getObjInfos(self, obj):
+        infos = []
+        members = inspect.getmembers(obj)
+        for eachMember in members:
+            obj = eachMember[1]
+            mem = eachMember[0]
+            tp = 'Obj'
+            if inspect.isfunction(obj) or inspect.ismethod(obj):
+                tp = 'Fn'
+            elif inspect.isbuiltin(obj):
+                tp = 'Fn-BuiltIn'
+            elif inspect.isclass(obj):
+                tp = 'Class'
+            elif inspect.ismodule(obj):
+                tp = 'Module'
+            elif inspect.iscode(obj):
+                tp = 'Code'
+            elif (type(obj) is type(1) or
+                type(obj) is type('') or
+                type(obj) is type([]) or
+                type(obj) is type(()) or
+                type(obj) is type({})
+              ):
+                tp = 'Variable'
+            elif type(obj) is type(None):
+                tp = 'Obj'
+            else:
+                tp = 'Obj'
+
+            infos.append([mem, tp, eachMember[1]])
+        return infos
+
+    def getDateTime(self, format="%Y-%m-%d %H:%M:%S"):
+        """
+        "%Y-%m-%d %H:%M:%S"
+        Directive Meaning Notes
+        %a Locale's abbreviated weekday name.
+        %A Locale's full weekday name.
+        %b Locale's abbreviated month name.
+        %B Locale's full month name.
+        %c Locale's appropriate date and time representation.
+        %d Day of the month as a decimal number [01,31].
+        %H Hour (24-hour clock) as a decimal number [00,23].
+        %I Hour (12-hour clock) as a decimal number [01,12].
+        %j Day of the year as a decimal number [001,366].
+        %m Month as a decimal number [01,12].
+        %M Minute as a decimal number [00,59].
+        %p Locale's equivalent of either AM or PM. (1)
+        %S Second as a decimal number [00,61]. (2)
+        %U Week number of the year (Sunday as the first day of the week) as a decimal number [00,53]. All days in a new year preceding the first Sunday are considered to be in week 0. (3)
+        %w Weekday as a decimal number [0(Sunday),6].
+        %W Week number of the year (Monday as the first day of the week) as a decimal number [00,53]. All days in a new year preceding the first Monday are considered to be in week 0. (3)
+        %x Locale's appropriate date representation.
+        %X Locale's appropriate time representation.
+        %y Year without century as a decimal number [00,99].
+        %Y Year with century as a decimal number.
+        %Z Time zone name (no characters if no time zone exists).
+        %% A literal "%" character.
+        """
+
+        format = format if format else self.cfg["general"]["dateTimeFormat"]
+        return datetime.datetime.now().strftime(format)
+
+    def createZip(self, folderToCompress, outputZipFile):
+        with zipfile.ZipFile(outputZipFile, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, _, files in os.walk(folderToCompress):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, folderToCompress)  # Preserve folder structure
+                    zipf.write(file_path, arcname)
+
+    def getFileContent(self, fileName):
+        '''
+        Get the file content
+        '''
+        f = open(fileName, "r", encoding='utf-8')
+        content = str(f.read())
+        f.close()
+        return content
+
+    def writeFileContent(self, fileName, data, mode='w'):
+        '''
+        Write file with given data
+        mode by default w. you can change to wb for writing binary file
+        '''
+        f = open(fileName, mode, encoding='utf-8')
+        f.write(str(data))
+        f.close()
+        return f"[{fileName}] saved with given data."
+
+    def cleanFolder(self, folder):
+        '''
+        Empty the given folder by deleting files and folders and sub-folders in it.
+        '''
+        folder = os.path.abspath(folder)
+        if os.path.exists(folder):
+            for filename in os.listdir(folder):
+                file_path = os.path.join(folder, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    self.error('Failed to delete %s. Reason: %s' % (file_path, e))
+        return "Done cleaning"
+
+    def copyFile(self, src, dst):
+        '''
+        Copy given single src source file to dst destination folder
+        '''
+        src = os.path.abspath(src)
+        dst = os.path.abspath(dst)
+        shutil.copy(src, dst)
+        return f'{src} file copied to {dst} folder'
+
+    def copyFolderSpl(self, src, dst):
+        '''
+        Copy given single src source folder to dst destination folder
+        '''        
+        src = os.path.abspath(src)
+        dst = os.path.abspath(dst)
+        shutil.copytree(src, dst)
+        return f'{src} file copied to {dst} folder'
+
+    def copyFolder(self, source_folder, destination_folder, latest_overwrite=1, forced_overwrite=1, verbose=1):
+        '''
+        Copy given src source folder to dst destination folder, will overwrite if already exist. makes dir/path folders if needed.
+        '''            
+        source_folder = os.path.abspath(source_folder)
+        destination_folder = os.path.abspath(destination_folder)
+        for root, dirs, files in os.walk(source_folder):
+            for item in files:
+                src_path = os.path.join(root, item)
+                dst_path = os.path.join(destination_folder, os.path.basename(src_path))
+                if os.path.exists(dst_path):
+                    if (not forced_overwrite and not latest_overwrite):
+                        if(verbose):
+                            self.info("Already exist, Skipping..." + src_path + " to " + dst_path)
+                    if (not forced_overwrite and latest_overwrite):
+                        if os.stat(src_path).st_mtime > os.stat(dst_path).st_mtime:
+                            if(verbose):
+                                self.info("Overwriting latest..." + src_path + " to " + dst_path)
+                            shutil.copy2(src_path, dst_path)
+                    if (forced_overwrite):
+                        if(verbose):
+                            self.info("Forced Overwriting..." + src_path + " to " + dst_path)
+                        self.forceDeleteFile(dst_path)
+                        shutil.copy2(src_path, dst_path)
+                else:
+                    if(verbose):
+                        self.info("Copying..." + src_path + " to " + dst_path)
+                    shutil.copy2(src_path, dst_path)
+            for item in dirs:
+                src_path = os.path.join(root, item)
+                dst_path = os.path.join(destination_folder, src_path.replace(source_folder, ""))
+                if not os.path.exists(dst_path):
+                    if(verbose):
+                        self.info("Creating folder..." + dst_path)
+                    os.mkdir(dst_path)
+        if(verbose):
+            self.debug("Copy process completed!")
+        
+        return f"{source_folder} copied to {destination_folder}"
+
+    def forceDeleteFile(self, fpath):
+        try:
+            os.remove(fpath)
+        except PermissionError:
+            self.debug("Force delete: " + fpath)
+            subprocess.run(["cmd", "/c", "del", "/F", "/Q", fpath], shell=False)
+        return f"Done deleting {fpath}"
+
+
+    def getFileList(self, dirToScan, extAllowed=[".py"], allowed=[], disallowed=[]):
+        """Recursively lists all files with the given extension in a directory and its subdirectories.
+
+        Args:
+            directory (str): The root directory to scan.
+            extension (str): The file extension to look for (e.g., ".txt").
+
+        Returns:
+            list: A list of file paths matching the extension.
+        """
+        matched_files = []
+        
+        is_extallowed = lambda filename, allowed_extensions: filename.lower().endswith(tuple(extAllowed))
+
+        for root, _, files in os.walk(dirToScan):
+            for file in files:
+                if is_extallowed(file, extAllowed):
+                    if allowed and disallowed and self.isListedItemPresentInText(allowed, file) and not self.isListedItemPresentInText(disallowed, file):
+                        matched_files.append(os.path.abspath(os.path.join(root, file)))
+                    elif allowed and not disallowed and self.isListedItemPresentInText(allowed, file):
+                        matched_files.append(os.path.abspath(os.path.join(root, file)))
+                    elif not allowed and disallowed and not self.isListedItemPresentInText(disallowed, file):
+                        matched_files.append(os.path.abspath(os.path.join(root, file)))
+                    elif not allowed and not disallowed:
+                        matched_files.append(os.path.abspath(os.path.join(root, file)))
+
+        return matched_files
+
+    def _buildCallerPath(self, parentOnly=0):
+        stack = inspect.stack()
+        path = ""
+        for eachStack in stack:
+            if("self" in eachStack[0].f_locals.keys()):
+                the_class = eachStack[0].f_locals["self"].__class__.__name__
+                the_method = eachStack[0].f_code.co_name
+                if(the_class != "basic"):
+                    if(parentOnly):
+                        path = "{}.{}()->".format(the_class, the_method)
+                    else:
+                        path += "{}.{}()->".format(the_class, the_method)
+        return path
+
+    def makeEmptyFile(self, fileName):
+        fileName = os.path.abspath(fileName)
+        self.makePathForFile(fileName)
+        self.writeFileContent(fileName, '')
+
+    def makePathForFile(self, file):
+        file = os.path.abspath(file)
+        base = os.path.dirname(file)
+        self.makePath(base)
+
+    def makePath(self, path):
+        '''
+        If path (absolute path) doesnt exist - means folders not created.
+        this fn will create them.
+        '''
+        path = os.path.abspath(path)
+        if(not os.path.exists(path) and path != ''):
+            os.makedirs(path)
+        else:
+            self.warn("Path exists " + path)
+        return f"{path} Ready!"
+
+    def isFileExists(self, path):
+        return os.path.isfile(path) and os.path.exists(path) and path != '' and path is not None
+
+    def isFolderExists(self, path):
+        return os.path.isdir(path) and os.path.exists(path) and path != '' and path is not None
+
+    def isItFile(self, path):
+        return os.path.isfile(path) and path != '' and path is not None
+
+    def isItFolder(self, path):
+        return os.path.isdir(path) and path != '' and path is not None
+
+    def getFileParts(self, fileNameWithPath):
+        if self.isItFile(fileNameWithPath):
+            filePath = os.path.dirname(fileNameWithPath)
+            fileName = os.path.basename(fileNameWithPath)
+            fileName,fileExt = os.path.splitext(fileName)
+            return filePath, fileName, fileExt
+        else:
+            return None, None, None
+
+    def pathClean(self, inputFile):
+        inputFile = os.path.normpath(inputFile)
+        inputFile = os.path.abspath(inputFile)
+        return inputFile
+
+    def pathParts(self, inputFile):
+        inputFile = self.pathClean(inputFile)
+        fileNameWithExt = os.path.basename(inputFile)
+        fileName, Ext = os.path.splitext(fileNameWithExt)
+        filePath = os.path.dirname(inputFile)
+        Ext = Ext[1:] if Ext.startswith('.') else Ext
+        return filePath, fileName, Ext
+
+    def pathReady(self, inputPath):
+        inputPath = self.pathClean(inputPath)
+        if os.path.exists(inputPath):
+            return inputPath
+        if os.path.isfile(inputPath):
+            inputPath, fileName, Ext = self.pathParts(inputPath)
+        os.makedirs(inputPath)
+        return inputPath
+
+    def pathJoin(self, basePath, *joins):
+        finPath = basePath
+        for each in joins:
+            finPath = os.path.join(finPath, each)
+        return self.pathClean(finPath)
+
+    def readyCachePath(self):
+        if self.isLocalDev(): self.pathReady(self.localCachePath)
+
+    def isCacheAvailable(self, fileName, dated=0):
+        if dated: fileName = self._cacheName(fileName)
+        fileName = self._applyLocalCachePath(fileName)
+        return os.path.exists(fileName)
+
+    def getCache(self, fileName, defaultData=None, dated=0):
+        if dated: fileName = self._cacheName(fileName)
+        fileName = self._applyLocalCachePath(fileName)
+        if self.isCacheAvailable(fileName):
+            #self.debug(f'Reading cache {fileName}')
+            f = open(fileName, 'rb')
+            data = pickle.load(f)
+            f.close()
+        else:
+            self.debug(f'Cache not found: {fileName}')
+            self.setCache(fileName, defaultData)
+            data = defaultData
+        return data
+
+    def setCache(self, fileName, data, dated=0):
+        if dated: fileName = self._cacheName(fileName)
+        fileName = self._applyLocalCachePath(fileName)
+        self.debug(f'Writing cache {fileName}')
+        picData = pickle.dumps(data)
+        f = open(fileName, 'wb')
+        f.write(picData)
+        f.close()
+
+    def _applyLocalCachePath(self, fileName):
+        localCachePath = self.getSafeConfig(["folders", "cache"], ".")
+        self.pathReady(localCachePath)
+        return self.pathJoin(localCachePath, fileName)
+
+    def _cacheName(self, fileName):
+        nw = self.getDateTime('%Y%m%d')
+        cacheName = f'{nw}_{fileName}'
+        return cacheName
+
+    def pickleSaveObject(self, obj, file=""):
+        if(obj is None):
+            self.log.error("Pass me valid object to save" + obj)
+        className = obj.__class__.__name__
+        if(file is None or file == ""):
+            file = className + ".txt"
+        base = os.path.dirname(file)
+        if(not os.path.exists(base) and base != ''):
+            os.makedirs(base)
+        f = open(file, "wb")
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+        f.close()
+        self.log("Saved!" + className + "-" + file)
+
+    def pickleLoadObject(self, file):
+        x = None
+        if(file is None or file == ""):
+            self.log.error("Pass me file name to read and pass the object")
+        if(os.path.exists(file)):
+            try:
+                f = open(file, "rb")
+                x = pickle.load(f)
+                f.close()
+                self.log.info ("File read and obj returned " + file + " obj: " + x.__class__.__name__)
+            except:
+                self.log.error ("Error loading the pickle. Passing default!")
+        else:
+            self.log.error ("Error! File doesn't exist " + file)
+        return x
+
+    def shortHandNumberConverter(self, value: str) -> int:
+        """
+        Converts shorthand notation like '1K', '2.5M', '3T', '0.4P' into integers.
+
+        Supports:
+            K = Thousand (1_000)
+            M = Million (1_000_000)
+            B = Billion (1_000_000_000)
+            T = Trillion (1_000_000_000_000)
+            P = Quadrillion (1_000_000_000_000_000)
+
+        Args:
+            value (str): Input string, e.g., '720K', '1.5M', '2B'
+
+        Returns:
+            int: Equivalent integer value
+
+        Raises:
+            ValueError: If format is unrecognized
+        """
+        multipliers = {
+            'K': 1_000,
+            'M': 1_000_000,
+            'B': 1_000_000_000,
+            'T': 1_000_000_000_000,
+            'P': 1_000_000_000_000_000,
+        }
+
+        value = value.strip().upper().replace(',', '')
+
+        if not value:
+            raise ValueError("Empty value")
+
+        suffix = value[-1]
+
+        if suffix in multipliers:
+            num_part = value[:-1]
+            try:
+                return int(float(num_part) * multipliers[suffix])
+            except ValueError:
+                raise ValueError(f"Invalid numeric part: {num_part}")
+        elif value.isdigit():
+            return int(value)
+        else:
+            raise ValueError(f"Unrecognized format: {value}")
+
+    def doBackup(self, srcFile, bckUpToPath=1, bckUpPath='G:/pythonworkspace/myscripts/dataBackup', bckUpFmt='[FILENAME]_BKUP[TIMESTAMP].[EXT]'):
+        self.debug('Backup Src: ' + srcFile)
+        if not os.path.exists(srcFile):
+            self.raiseError(
+                'Unable to do old as src file not found ' + srcFile)
+            return 0
+        timeStamp = self.getDateTime('%Y%m%d%H%M%S')
+        filePath, fileName, Ext = self.pathParts(srcFile)
+        dstPath = self.pathReady(
+            bckUpPath) if bckUpToPath else self.pathClean('.')
+        dstFileName = bckUpFmt
+        dstFileName = dstFileName.replace('[FILENAME]', fileName)
+        dstFileName = dstFileName.replace('[TIMESTAMP]', timeStamp)
+        dstFileName = dstFileName.replace('[EXT]', Ext)
+        dstFile = self.pathJoin(dstPath, dstFileName)
+        self.debug('Backup Dst: ' + dstFile)
+        self.copyFile(srcFile, dstFile)
+        self.debug('Backup Done!')
+        return 1
+
+    def raiseError(self, msg='Technical Error'):
+        self.error(f"Technical Error: {msg}")
+        raise Exception(msg)
+
+    def smartBool(self, s):
+        if s is True or s is False: return s
+        s = str(s).strip().lower()
+        return not s in ['false', 'f', 'n', '0', '']
+
+if __name__ == "__main__":
+
+    appName = "UnitTest"
+    customLookUp = None
+    customJsonConfigFile = "config.json"
+
+    tls = KTools()
+
+    tls.info(f'---------------------------------------')
+    tls.info(f'Testing getTraceInfo:  {tls.getTraceInfo()}')
+    tls.error(f'Testing getLastErrorInfo:  {tls.getLastErrorInfo()}')
+    
+    tls.info(f'---------------------------------------')
+    tls.info(f'Testing log level info')
+    tls.debug(f'Testing log level debug')
+    tls.error(f'Testing log level error')
+    tls.warn(f'Testing log level warn')
+    
+    tls.info(f'---------------------------------------')    
+    tls.info(f'Testing isProd:  {tls.isProd()}')
+    tls.info(f'Testing isLocal:  {tls.isLocal()}')
+    
+    tls.info(f'---------------------------------------')    
+    tls.info(f'Testing getRandom: {tls.getRandom(10)}')
+    tls.info(f'Testing getRandom: {tls.getRandom(10)}')
+    tls.info(f'Testing getRandom: {tls.getRandom(10)}')
+    
+    tls.info(f'---------------------------------------')
+    tls.info(f'Testing getValue: {tls.getValue("test")}')
+    
+    
+    
+    tls.info(f'---------------------------------------')
+    #tls.raiseError("Custom Error")    
+    #tls.error(f'Viewing getLastErrorInfo:  {tls.getLastErrorInfo()}')
+
+    tls.info(f'---------------------------------------')
+    #tls.errorAndExit("Custom Error and Exit") 
+    #tls.info(f'This line and beyond this line nothing will be executed')
+    
+    
+    
+    tls.info("End of Testing")  
+    tls.info(f'---------------------------------------')          
+    
+
