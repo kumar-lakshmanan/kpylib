@@ -1,0 +1,3 @@
+NodeGraphQt
+kNodeEditor
+kQt

@@ -405,7 +405,7 @@ class KTools(object):
             return customPyLookUp
         else:
             try:
-                import kToolsDefaultLookUps
+                import kpylib.kToolsDefaultLookUps as kToolsDefaultLookUps
                 if kToolsDefaultLookUps: print("Default:" + str(kToolsDefaultLookUps))
                 return kToolsDefaultLookUps
             except ImportError:

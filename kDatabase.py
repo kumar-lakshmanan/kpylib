@@ -21,7 +21,7 @@ import requests
 import json
 import ast
 
-import kTools
+import kpylib.kTools as kTools
 
 class SimpleCouchDB():
 

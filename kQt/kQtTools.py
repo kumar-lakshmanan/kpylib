@@ -8,7 +8,7 @@ __updated__ = "2025-10-14"
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import (QAction, QVBoxLayout)
 from PyQt5.uic import loadUi
-import kTools
+import kpylib.kTools as kTools
 import functools
 
 import os, pickle

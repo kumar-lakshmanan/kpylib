@@ -6,7 +6,7 @@ Created on 23-Jan-2025
 import sys
 from PyQt5 import QtWidgets
 
-import kTools
+import kpylib.kTools as kTools
 from kNodeEditor.kneLib import KNELib
 from kQt.kTestWin import TestWindowRunner
 

@@ -1,0 +1,11 @@
+include README.md
+include requirements.txt
+include config.json
+include *.py
+recursive-include kpylib *.py
+recursive-include kNodeEditor *.py
+recursive-include kQt *.py
+global-exclude __pycache__
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *~

@@ -3,7 +3,7 @@ __updated__ = "2025-07-07"
 __author__ = "kayma"
 
 from playwright.sync_api import sync_playwright, Playwright
-import kTools
+import kpylib.kTools as kTools
 
 class WebScrapper:
     

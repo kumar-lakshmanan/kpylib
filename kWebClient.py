@@ -7,7 +7,7 @@ __created__ = "24-Apr-2025"
 __updated__ = "2025-07-07"
 __author__ = "kayma"
 
-import kTools
+import kpylib.kTools as kTools
 import requests
 import json
 

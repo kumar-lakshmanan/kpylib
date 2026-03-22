@@ -1,0 +1,11 @@
+requests
+pytest-playwright
+blinker
+wexpect
+beautifulsoup4
+CouchDB
+google-cloud-firestore
+google-auth
+functions-framework==3.*
+pytz
+mysql-connector-python

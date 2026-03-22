@@ -8,7 +8,7 @@ import sys
 from PyQt5 import QtWidgets
 from PyQt5.uic import loadUi
 
-import kTools
+import kpylib.kTools as kTools
 from kQt import kQtTools 
 
 class WindowRunner(QtWidgets.QMainWindow):

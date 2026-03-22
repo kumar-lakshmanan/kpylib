@@ -9,7 +9,7 @@ __author__ = "kayma"
 
 import os, sys, time, json, site, importlib, code, inspect, types, atexit, threading, traceback
 from time import strftime
-from kTools import KTools
+from kpylib.kTools import KTools
 
 # Single line console command capture response and give back on demand
 class CapturingConsole(code.InteractiveConsole):
