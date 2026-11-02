@@ -10,7 +10,7 @@ To integerate in any app, It needs four main thing needed at start-up....
 
 -kpylib:
     custom lib folder (this folder) which has all lib needed for this app to work.
-    kpylib  (G:\pyworkspace\kpylib) should be in sys.path. and should import kTools module.
+    kpylib  (G:\\pyworkspace\\kpylib) should be in sys.path. and should import kTools module.
     atleast this path should be in environment variable - K_PYLIB. else default value given at the beginning will be added to env & sys.path.
     Also. In your development env IDE, use this folder as reference for development time reference links.
 
@@ -25,14 +25,14 @@ To integerate in any app, It needs four main thing needed at start-up....
     
     
 #-------ADD THIS HEADER CODE TO YOUR MAIN------
-import os, sys
+import os,sys
 K_PYLIB = '../kpylib'
 K_CONFIG = os.path.abspath('config.json')
-if not ('K_PYLIB' in os.environ and os.path.exists(os.environ['K_PYLIB'])): os.environ['K_PYLIB'] = K_PYLIB
-if not ('K_PYLIB' in os.environ and os.path.exists(os.environ['K_PYLIB'])): sys.exit("K_PYLIB not found!")
-for eachDependency in os.environ['K_PYLIB'].split(';'): sys.path.append(eachDependency.strip())
-if not ('K_CONFIG' in os.environ and os.path.exists(os.environ['K_CONFIG'])): os.environ['K_CONFIG'] = K_CONFIG
-if not ('K_CONFIG' in os.environ and os.path.exists(os.environ['K_CONFIG'])): sys.exit("K_CONFIG not found!")
+_kpylib = os.environ.get("K_PYLIB", K_PYLIB)
+_kconfig = os.environ.get("K_CONFIG", K_CONFIG)
+if not os.path.exists(_kpylib): sys.exit("K_PYLIB not found!")
+if not os.path.exists(_kconfig): sys.exit("K_CONFIG not found!")
+sys.path.extend(x.strip() for x in _kpylib.split(os.pathsep))
 #----------------------------------------------
 
 # ------BASIC setup example-----------
@@ -63,7 +63,7 @@ import kTools; tls = kTools.KTools()
 --------------------
 Env variables and descriptions
 
-K_PYLIB            -   \kpylib                Folder location of this file.
+K_PYLIB            -   \\kpylib                Folder location of this file.
 K_CONFIG           -   config.json            JSON Config file.
 K_ISPROD           -   1/0                    1 For actual prod, 0 or Missing For non prod.
 COMPUTERNAME       -   SYSTEM WILL SET        Additionally, IN CONFIG, GIVE YOUR developr SYSTEM NAME. So it finds the dev mode or prod mode.
@@ -98,24 +98,24 @@ tmp = tls.lookUp.<prop>
 # Accesing the config properties
 tmp = tls.cfg["gen"]["prop"]
 tmp = tls.getSafeConfig(<list>, defaultValue)
-
-
 '''
+
 __created__ = "24-Apr-2025"
 __updated__ = "2026-03-19"
 __author__ = "kayma"
 
 import os, sys
-
-from pathlib import Path
-from datetime import timedelta
+from datetime import datetime, timezone, timedelta
 from time import strftime
-import logging
+from typing import Optional
+from pathlib import Path
 import logging.config
+import logging
 import json
 import zipfile
 import subprocess
 import traceback
+import requests
 import datetime
 import getpass
 import inspect
@@ -127,9 +127,13 @@ import shutil
 import atexit
 import uuid
 import types
+import gzip
+import io
 import gc
 import ast
 import site
+import csv
+import os
 
 # Fix for Unicode encoding issues on Windows
 if sys.platform == "win32":
@@ -462,7 +466,10 @@ class KTools(object):
             self.logSys.addHandler(streamHandler)
 
         if self.cfg["logging"]["logToFile"]:
-            fileHandler = logging.FileHandler(self.cfg["logging"]["logFile"])
+            logFileName = self.cfg["logging"]["logFile"]
+            if self.cfg["logging"]["logToFileDated"]:
+                logFileName = self.upendDateTimeToFileName(logFileName)
+            fileHandler = logging.FileHandler(logFileName)
             fileHandler.set_name(f"FileHandler_{self.appName}")
             fileHandler.setFormatter(self.logFormatter)
             if hasattr(fileHandler.stream, 'encoding'):
@@ -623,7 +630,7 @@ class KTools(object):
 
     #------------------------------------------------------------------------    
 
-    def info(self, msg, skipLevel=2):
+    def info(self, msg="", skipLevel=2):
         msg = self._logFormatter(msg, skipLevel)
         if not self._logSkipFilter(msg):
             msg = self.passwordCleanInfo(msg)
@@ -756,6 +763,7 @@ class KTools(object):
     #------------------------------------------------------------------------
 
     def shellExecuteWait(self, command):
+        tls.debug(command)
         subprocess.call(command)
 
     def shellExecuteNoBlock(self, command):
@@ -1055,6 +1063,9 @@ class KTools(object):
         format = format if format else self.cfg["general"]["dateTimeFormat"]
         return datetime.datetime.now().strftime(format)
 
+    def getCurrentDateTimeObj(self):
+        return datetime.datetime.now()
+
     def createZip(self, folderToCompress, outputZipFile):
         with zipfile.ZipFile(outputZipFile, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for root, _, files in os.walk(folderToCompress):
@@ -1062,6 +1073,14 @@ class KTools(object):
                     file_path = os.path.join(root, file)
                     arcname = os.path.relpath(file_path, folderToCompress)  # Preserve folder structure
                     zipf.write(file_path, arcname)
+
+    def upendDateTimeToFileName(self, fileNameWithPath, format="%Y%m%d"):
+        filePath, fileName, fileExt = self.pathParts(fileNameWithPath)
+        if not self.isFileExists(filePath): self.pathReady(filePath)
+        timestampToupend = self.getDateTimeStamp(format)
+        newFileName = f"{fileName}_{timestampToupend}{fileExt}"
+        newFileWithPath = self.pathJoin(filePath, newFileName)
+        return newFileWithPath
 
     def getFileContent(self, fileName):
         '''
@@ -1332,22 +1351,22 @@ class KTools(object):
         f = open(file, "wb")
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
         f.close()
-        self.log("Saved!" + className + "-" + file)
+        self.info("Saved!" + className + "-" + file)
 
     def pickleLoadObject(self, file):
         x = None
         if(file is None or file == ""):
-            self.log.error("Pass me file name to read and pass the object")
+            self.error("Pass me file name to read and pass the object")
         if(os.path.exists(file)):
             try:
                 f = open(file, "rb")
                 x = pickle.load(f)
                 f.close()
-                self.log.info ("File read and obj returned " + file + " obj: " + x.__class__.__name__)
+                self.info ("File read and obj returned " + file + " obj: " + x.__class__.__name__)
             except:
-                self.log.error ("Error loading the pickle. Passing default!")
+                self.error ("Error loading the pickle. Passing default!")
         else:
-            self.log.error ("Error! File doesn't exist " + file)
+            self.error ("Error! File doesn't exist " + file)
         return x
 
     def shortHandNumberConverter(self, value: str) -> int:
@@ -1424,6 +1443,211 @@ class KTools(object):
         if s is True or s is False: return s
         s = str(s).strip().lower()
         return not s in ['false', 'f', 'n', '0', '']
+
+    # 1. Download CSV
+    def download_csv(self, url, dest_path):
+        """Download CSV with the headers NSE expects."""
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/csv,application/octet-stream,*/*",
+            "Accept-Encoding": "identity",
+            "Accept-Language": "en-GB,en;q=0.9",
+        }
+
+        resp = requests.get(url, headers=headers, timeout=30)
+        resp.raise_for_status()
+        data = resp.content
+
+        try:
+            text = data.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise ValueError(
+                "The server returned binary data, not a UTF-8 CSV. "
+                f"Content-Type: {resp.headers.get('Content-Type')}; "
+                f"Content-Encoding: {resp.headers.get('Content-Encoding')}; "
+                f"First 20 bytes: {data[:20]!r}. "
+                "Check that the URL points to the CSV download."
+            ) from exc
+
+        if text.lstrip().lower().startswith(("<!doctype html", "<html")):
+            raise ValueError(
+                "The server returned an HTML page instead of a CSV. "
+                "The URL may require a session or may have returned an error page."
+            )
+
+        with open(dest_path, "wb") as f:
+            f.write(data)
+
+    # 2. Read CSV into list of dicts
+    def read_csv_to_dicts(self, csv_path):
+        # Try UTF‑8‑BOM first
+        try:
+            with open(csv_path, newline="", encoding="utf-8-sig") as f:
+                return list(csv.DictReader(f))
+        except UnicodeDecodeError:
+            # Fallback: read raw bytes, decode with replacement
+            with open(csv_path, "rb") as f:
+                raw = f.read()
+            text = raw.decode("utf-8", errors="replace")
+            # If the file still contains unescaped newlines, try to split manually
+            # and skip malformed rows
+            rows = []
+            reader = csv.DictReader(StringIO(text))
+            for row in reader:
+                rows.append(row)
+            return rows
+
+    # 3. Append rows to existing CSV
+    def append_to_csv(self, csv_path, rows, header):
+        file_exists = os.path.exists(csv_path)
+        with open(csv_path, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=header)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerows(rows)
+
+    def prepend_to_csv(self, csv_path: str, new_rows: list[dict], header: list[str]) -> None:
+        """
+        Insert `new_rows` immediately after the header of `csv_path`.
+
+        Parameters
+        ----------
+        csv_path : str
+            Path to the CSV file that will be updated.
+        new_rows : list[dict]
+            Rows to insert. Each dict must contain the same keys as the header.
+        header : list[str]
+            Header row (list of column names).  Must match the keys of `new_rows`.
+        """
+        # 1. Read the existing file (if it exists)
+        existing_rows = []
+        if os.path.exists(csv_path):
+            with open(csv_path, newline='', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                existing_rows = list(reader)
+
+        # 2. Write the header + new rows + old rows back to the file
+        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=header)
+            writer.writeheader()          # header
+            writer.writerows(new_rows)    # new rows
+            writer.writerows(existing_rows)  # old rows
+
+    def jsonLogUpdater(self, logFile: str | Path, jsonDict: dict) -> None:
+        """
+        Append a JSON object to a log file that stores a JSON array.
+
+        Parameters
+        ----------
+        logFile : str | Path
+            Full path to the log file.  If the file does not exist, it will be
+            created and an empty array `[]` will be written first.
+        jsonDict : dict
+            The dictionary that should be appended as a JSON object.
+
+        Notes
+        -----
+        * The file is always written as a single JSON array.
+          Each call appends a new element to that array.
+        * The function is safe for repeated calls – it reads the current
+          contents, appends the new entry, and writes the whole array back.
+        * If the file is empty or contains only whitespace, it is treated as
+          a new file and an empty array is created before appending.
+        """
+        log_path = Path(logFile)
+
+        # Ensure the directory exists
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Load existing data if the file exists and is non‑empty
+        if log_path.exists() and log_path.stat().st_size > 0:
+            try:
+                with log_path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if not isinstance(data, list):
+                        # If the file contains something other than a list,
+                        # start fresh to avoid corruption.
+                        data = []
+            except json.JSONDecodeError:
+                # Corrupted or malformed JSON – start fresh
+                data = []
+        else:
+            # File does not exist or is empty – start with an empty list
+            data = []
+
+        # Append the new dictionary
+        data.append(jsonDict)
+
+        # Write back the whole array
+        with log_path.open("w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+    def parse_datetime(self, text: str) -> datetime:
+        """
+        Parse a date/time string that may appear in one of the following forms:
+
+            2026-10-21T19:01:08Z          # ISO‑8601 UTC
+            21-Sep-2026 15:11:21          # DD-MMM-YYYY HH:MM:SS
+            2026-09-21 15:11:21           # YYYY-MM-DD HH:MM:SS
+            2026-09-21                    # YYYY-MM-DD
+            20260921                      # YYYYMMDD
+
+        If the string contains no time component, the returned datetime will have
+        the time set to 00:00:00.  The function raises ValueError if none of the
+        patterns match.
+
+        Parameters
+        ----------
+        text : str
+            The date/time string to parse.
+
+        Returns
+        -------
+        datetime
+            A datetime object representing the parsed value.
+        """
+        # Normalise whitespace and strip surrounding quotes
+        s = text.strip().replace('"', '').replace("'", '')
+
+        # 1. ISO‑8601 with trailing 'Z' (UTC)
+        try:
+            if s.endswith('Z'):
+                return datetime.datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ")
+        except Exception:
+            pass
+
+        # 2. DD-MMM-YYYY HH:MM:SS
+        try:
+            return datetime.datetime.strptime(s, "%d-%b-%Y %H:%M:%S")
+        except Exception:
+            pass
+
+        # 3. YYYY-MM-DD HH:MM:SS
+        try:
+            return datetime.datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+
+        # 4. YYYY-MM-DD  (no time)
+        try:
+            return datetime.datetime.strptime(s, "%Y-%m-%d")
+        except Exception:
+            pass
+
+        # 5. YYYYMMDD  (no time)
+        try:
+            return datetime.datetime.strptime(s, "%Y%m%d")
+        except Exception:
+            pass
+
+        # If we reach here, none of the patterns matched
+        raise ValueError(f"Unrecognised date/time format: {text!r}")
+
 
 if __name__ == "__main__":
 

@@ -3,7 +3,61 @@
 > The `kTools` library is a **singleton** utility collection that powers many of the scripts in this project. It is designed to be lightweight, easy to drop into any Python application, and comes with a full set of helpers for configuration, logging, file handling, system integration, and simple encryption.
 
 ---
+## PreSetup
+!! IMPORTANT !!
 
+This lib should be available in pythonpath. Use any trick. But add this to the pythonpath.
+Below are sample options.
+
+1. Create a .pth file 
+```
+    Find your interpreter's site-packages folder:
+    
+    Python
+    import site
+    print(site.getsitepackages())
+```
+then, create file - mypaths.pth with below content
+```
+G:\pyworkspace\kpylib
+G:\pyworkspace\somemore_lib_proj
+```
+
+2. sitecustomize.py (i use this)
+```
+Just like in Option.1, instead of creating .pth path create sitecustomize.py file with below content
+
+import sys
+
+sys.path.insert(0, r"G:\pyworkspace\kpylib")
+sys.path.insert(0, r"G:\pyworkspace\somemore_lib_proj")
+```
+
+3. System Env Variable (Least Prefered)
+    Add sys env variable K_PYLIB and set its value G:\pyworkspace\kpylib
+    else in your first executing code. you can have below snippet
+
+```
+import os,sys
+K_PYLIB = '../kpylib'
+K_CONFIG = os.path.abspath('config.json')
+_kpylib = os.environ.get("K_PYLIB", K_PYLIB)
+_kconfig = os.environ.get("K_CONFIG", K_CONFIG)
+if not os.path.exists(_kpylib): sys.exit("K_PYLIB not found!")
+if not os.path.exists(_kconfig): sys.exit("K_CONFIG not found!")
+sys.path.extend(x.strip() for x in _kpylib.split(os.pathsep))
+
+#----------------------------------------------
+import kTools
+tls = kTools.KTools()   
+```
+
+Additional to above any one option. along with it, do this too if you are using pycharm or any idea. So that IDE will populate autocomplete.
+```
+PyCharm Settings -> Python -> Interpreter -> Python Interpreter Drop Drown -> Show All... -> Interpreter Paths -> Add Custom Path
+```
+
+---
 ## Quick Start
 
 ```bash
@@ -13,7 +67,7 @@ python -m pip install -e .
 
 ```python
 # Simple example
-from commonlib import kTools
+import kTools
 
 tls = kTools.KTools("MyApp", defaults=None, CONFIG_JSON="config.json")
 
