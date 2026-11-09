@@ -106,6 +106,7 @@ __author__ = "kayma"
 
 import os, sys
 from datetime import datetime, timezone, timedelta
+from io import StringIO
 from time import strftime
 from typing import Optional
 from pathlib import Path
@@ -628,7 +629,17 @@ class KTools(object):
                 return True
         return False
 
-    #------------------------------------------------------------------------    
+    #------------------------------------------------------------------------
+
+    def printLine(self, printchar="=", length=80):
+        self.info(printchar * length,3)
+
+    def printKeyValue(self, key, value, fill_char=".", width=70, gap=2):
+        key = str(key)
+        value = str(value)
+        dots = fill_char * max(gap, width - len(key) - len(value))
+        output = f"{key} {dots} {value}"
+        self.info(output,3)
 
     def info(self, msg="", skipLevel=2):
         msg = self._logFormatter(msg, skipLevel)
@@ -1076,7 +1087,7 @@ class KTools(object):
 
     def upendDateTimeToFileName(self, fileNameWithPath, format="%Y%m%d"):
         filePath, fileName, fileExt = self.pathParts(fileNameWithPath)
-        if not self.isFileExists(filePath): self.pathReady(filePath)
+        self.makePathForFile(fileNameWithPath)
         timestampToupend = self.getDateTimeStamp(format)
         newFileName = f"{fileName}_{timestampToupend}{fileExt}"
         newFileWithPath = self.pathJoin(filePath, newFileName)
@@ -1642,6 +1653,12 @@ class KTools(object):
         # 5. YYYYMMDD  (no time)
         try:
             return datetime.datetime.strptime(s, "%Y%m%d")
+        except Exception:
+            pass
+
+        # 6. 20261105054440AM  (no time)
+        try:
+            return datetime.datetime.strptime(s, "%Y%m%d%I%M%S%p")
         except Exception:
             pass
 
