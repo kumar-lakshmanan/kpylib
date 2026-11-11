@@ -1623,6 +1623,7 @@ class KTools(object):
             A datetime object representing the parsed value.
         """
         # Normalise whitespace and strip surrounding quotes
+        text = str(text)
         s = text.strip().replace('"', '').replace("'", '')
 
         # 1. ISO‑8601 with trailing 'Z' (UTC)
